@@ -39,6 +39,14 @@ onboarding.yaml
 workspace/*
 !workspace/README.md
 
+# Adopter-specific portfolio documents and project artifacts stay local.
+projects/*
+!projects/README.md
+
+# Local portfolio registry — contains machine-specific workspace paths.
+# Skills consume this file, but each adopter maintains their own copy.
+/apexyard.projects.yaml
+
 # Adopter-specific agent routing (single-fork mode; split-portfolio mode
 # keeps this in the private repo). See docs/multi-project.md § "Centralised
 # agent routing" and docs/agdr/AgDR-0050-agent-runtime-overhaul.md.
