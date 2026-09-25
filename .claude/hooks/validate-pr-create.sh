@@ -331,7 +331,7 @@ if [ -n "$TITLE" ]; then
   # Scans the body file and the raw command (inline --body), like the
   # section check below.
   TICKET_REF=$(printf '%s\n%s\n' "$BODY_CONTENT" "$COMMAND" | \
-    grep -oiE '\b(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]]+(#[0-9]+|[A-Z]{2,10}-[0-9]+)\b' | \
+    grep -oE '\b([Cc][Ll][Oo][Ss][Ee][SsDd]?|[Ff][Ii][Xx]([Ee][SsDd])?|[Rr][Ee][Ss][Oo][Ll][Vv][Ee][SsDd]?)[[:space:]]+(#[0-9]+|[A-Z]{2,10}-[0-9]+)\b' | \
     head -1 | grep -oE '(#[0-9]+|[A-Z]{2,10}-[0-9]+)$')
   if [ -z "$TICKET_REF" ]; then
     ERRORS="${ERRORS}PR body doesn't link a ticket. Add a closing keyword such as 'Closes #N' (cross-repo 'owner/repo#N' is not accepted).\n"

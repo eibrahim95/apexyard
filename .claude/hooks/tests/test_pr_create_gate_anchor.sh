@@ -164,6 +164,12 @@ run_case 'a ticket ID in the title scope BLOCKS (the scope names a component, Ag
 
 BF_NOREF=$(mktemp /tmp/test-gate-anchor-noref.XXXXXX.md)
 printf '%s' "$BODY_OK" | grep -viE '^(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]]' > "$BF_NOREF"
+BF_PROSE=$(mktemp /tmp/test-gate-anchor-prose.XXXXXX.md)
+printf 'This fixes utf-8 decoding.\n%s' "$BODY_OK" > "$BF_PROSE"
+run_case 'prose like "fixes utf-8" before Closes #N does not hide the ticket' \
+  "gh pr create --repo me2resh/apexyard --title 'fix(hooks): gate anchor' --head fix/GH-900-test --body-file $BF_PROSE" \
+  0 ""
+
 run_case 'a body with no closing reference BLOCKS' \
   "gh pr create --repo me2resh/apexyard --title 'fix(hooks): gate anchor' --head fix/GH-900-test --body-file $BF_NOREF" \
   2 "doesn't link a ticket"
@@ -282,7 +288,7 @@ run_case 'same shape (|) with an unquoted malformed title still BLOCKS' \
   "gh pr create --repo me2resh/apexyard --title fixbug --head fix/GH-900-test | cat" \
   2 "doesn't match format"
 
-rm -f "$BF_OK" "$BF_NOREF"
+rm -f "$BF_OK" "$BF_NOREF" "$BF_PROSE"
 
 echo ""
 echo "==================================="

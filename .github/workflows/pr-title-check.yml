@@ -57,7 +57,9 @@ jobs:
               return;
             }
 
-            const ref = body.match(/\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+(#\d+|[A-Z]{2,10}-\d+)\b/i);
+            // Keyword is case-insensitive; the ticket shape is not, so prose
+            // like "fixes utf-8" is not mistaken for a ticket.
+            const ref = body.match(/\b(?:[Cc][Ll][Oo][Ss][Ee][SsDd]?|[Ff][Ii][Xx](?:[Ee][SsDd])?|[Rr][Ee][Ss][Oo][Ll][Vv][Ee][SsDd]?)\s+(#\d+|[A-Z]{2,10}-\d+)\b/);
             if (!ref) {
               core.setFailed(
                 `❌ PR body must link a ticket with a closing keyword\n\n` +
