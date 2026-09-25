@@ -121,7 +121,7 @@ Read the named file when the work matches. Do not auto-import these files.
 
 These one-liners stay here because agents use them on almost every turn. The full text is in the files above. Hooks enforce the hard cases.
 
-- Branch `{type}/{TICKET-ID}-{description}`. PR title `type(TICKET): description`.
+- Branch `{type}/{TICKET-ID}-{description}`. PR title `type(scope): description`; link the ticket in the body (`Closes #N`).
 - Never `git add -A` or `git add .`. Never push directly to `main`.
 - Tests, lint, typecheck, and build must pass before push. Coverage for domain logic stays above 80%.
 - Every merge needs Rex plus an explicit per-PR human nod. A plan-level "go" does not authorize merge.

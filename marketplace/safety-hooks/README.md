@@ -17,7 +17,7 @@
 | `block-git-add-all.sh` | `git add -A` / `git add .` / `git add --all` — forces specific-file staging so sensitive files (`.env`, credentials.json) and large binaries don't get hoovered up |
 | `pre-push-gate.sh` | Reminds you to run lint / typecheck / tests / build BEFORE pushing — prevents wasted CI minutes on broken pushes |
 | `verify-commit-refs.sh` | Commit messages with `Closes #N` / `Refs #N` / `Fixes #N` pointing at issues that don't exist in your tracker. Catches typo + fabricated references. |
-| `validate-pr-create.sh` | PR titles that don't match `type(TICKET): description` format, reference non-existent issues, or skip the ticket ID |
+| `validate-pr-create.sh` | PR titles that don't match `type(scope): description` format, or bodies that don't link an existing, open ticket (`Closes #N`) |
 | `validate-branch-name.sh` | Branch names that don't match `{type}/{TICKET-ID}-{description}` — keeps git history scannable |
 
 **Supporting libs (extracted from upstream):**

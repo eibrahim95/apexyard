@@ -78,15 +78,17 @@ build_cmd() {
 }
 
 # Helper: write a body file inside the sandbox, then build the command + run.
+# ticket_ref (e.g. "#42") is appended to the body as "Closes <ref>" — the
+# ticket now lives in the body, not the title (AgDR-0165).
 run_pr_case() {
-  local label="$1" with_upstream="$2" title="$3" with_repo_flag="$4" want_rc="$5" want_stderr_regex="$6" exist_setup="${7:-}"
+  local label="$1" with_upstream="$2" title="$3" ticket_ref="$4" with_repo_flag="$5" want_rc="$6" want_stderr_regex="$7" exist_setup="${8:-}"
   local sb; sb=$(make_sandbox_fork "$with_upstream")
   mock_gh_install "$sb"
   if [ -n "$exist_setup" ]; then
     eval "$exist_setup"
   fi
   local body_file="$sb/body.md"
-  printf '%s' "$BODY" > "$body_file"
+  printf '%s\n\nCloses %s' "$BODY" "$ticket_ref" > "$body_file"
   local cmd; cmd=$(build_cmd "$title" "$with_repo_flag" "$body_file")
   local input
   input=$(jq -nc --arg c "$cmd" '{tool_input:{command:$c}}')
@@ -111,29 +113,29 @@ run_pr_case() {
 # ---- Cases --------------------------------------------------------------
 
 # Regression: #N exists in origin, no upstream remote → pass.
-run_pr_case "title #N in origin, no upstream → pass" \
-  "no" "fix(#42): something" "no" 0 ""
+run_pr_case "body #N in origin, no upstream → pass" \
+  "no" "fix(hooks): something" "#42" "no" 0 ""
 
 # NEW: #N missing in origin, present in upstream → pass.
-run_pr_case "title #N in upstream only → pass (the #207 fix)" \
-  "yes" "fix(#150): upstream issue" "no" 0 "" \
+run_pr_case "body #N in upstream only → pass (the #207 fix)" \
+  "yes" "fix(hooks): upstream issue" "#150" "no" 0 "" \
   'mock_gh_set_repo_existence "$sb" 150 fork-org/apexyard no
    mock_gh_set_repo_existence "$sb" 150 me2resh/apexyard yes'
 
 # Regression: missing in both → block, error message names both.
-run_pr_case "title #N missing in both → block, names both" \
-  "yes" "fix(#99999): phantom" "no" 2 "does not.*exist|or upstream" \
+run_pr_case "body #N missing in both → block, names both" \
+  "yes" "fix(hooks): phantom" "#99999" "no" 2 "does not.*exist|or upstream" \
   'mock_gh_set_repo_existence "$sb" 99999 fork-org/apexyard no
    mock_gh_set_repo_existence "$sb" 99999 me2resh/apexyard no'
 
 # Regression: origin exists, no upstream configured → pass.
-run_pr_case "title #N in origin, upstream unconfigured → pass" \
-  "no" "feat(#5): do thing" "no" 0 ""
+run_pr_case "body #N in origin, upstream unconfigured → pass" \
+  "no" "feat(hooks): do thing" "#5" "no" 0 ""
 
 # CLOSED-in-upstream → block. Tests that the CLOSED error names the upstream
 # repo (the one that actually matched) rather than always saying origin.
-run_pr_case "title #N CLOSED in upstream → block, error names upstream" \
-  "yes" "fix(#321): closed in upstream" "no" 2 "me2resh/apexyard.*CLOSED|CLOSED.*me2resh/apexyard" \
+run_pr_case "body #N CLOSED in upstream → block, error names upstream" \
+  "yes" "fix(hooks): closed in upstream" "#321" "no" 2 "me2resh/apexyard.*CLOSED|CLOSED.*me2resh/apexyard" \
   'mock_gh_set_repo_existence "$sb" 321 fork-org/apexyard no
    mock_gh_set_repo_existence "$sb" 321 me2resh/apexyard yes
    mock_gh_set_state "$sb" 321 CLOSED'
@@ -141,14 +143,14 @@ run_pr_case "title #N CLOSED in upstream → block, error names upstream" \
 # Existing behavior: --repo me2resh/apexyard makes TRACKER_REPO = upstream
 # directly. The upstream-fallback would then be skipped (UPSTREAM_REPO ==
 # TRACKER_REPO). Should still pass for an issue that exists in upstream.
-run_pr_case "title #N with --repo upstream → pass (upstream IS tracker)" \
-  "yes" "fix(#200): explicit upstream" "yes" 0 "" \
+run_pr_case "body #N with --repo upstream → pass (upstream IS tracker)" \
+  "yes" "fix(hooks): explicit upstream" "#200" "yes" 0 "" \
   'mock_gh_set_repo_existence "$sb" 200 me2resh/apexyard yes'
 
 # Short-circuit: origin yes, upstream no → upstream not consulted.
 # Indirect verification: the case passes because origin matches first.
 run_pr_case "origin yes, upstream no → pass (short-circuit)" \
-  "yes" "fix(#7): in origin" "no" 0 "" \
+  "yes" "fix(hooks): in origin" "#7" "no" 0 "" \
   'mock_gh_set_repo_existence "$sb" 7 fork-org/apexyard yes
    mock_gh_set_repo_existence "$sb" 7 me2resh/apexyard no'
 

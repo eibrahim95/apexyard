@@ -42,7 +42,7 @@ These aren't style suggestions — `.claude/hooks/` blocks them mechanically, so
 | Rule | Shape |
 |------|-------|
 | **Branch name** | `{type}/{TICKET-ID}-{slug}` — types: `feature, fix, refactor, chore, docs, test, spike, ci, build, perf`. e.g. `fix/GH-42-login-redirect` |
-| **PR title** | `type(TICKET): description` — one ticket per title. e.g. `feat(#42): add session refresh` |
+| **PR title** | `type(scope): description` — e.g. `feat(auth): add session refresh`. Link the ticket in the body with `Closes #42` |
 | **PR body** | Must include a `## Summary`, `## Testing`, and `## Glossary` section (see the PR template — it's pre-filled). |
 | **Commits** | Conventional commits: `type: subject`. No `git add -A` / `.` — stage specific files. No direct pushes to `main`. |
 | **Secrets / private config** | No hardcoded secrets; don't commit a filled-in `onboarding.yaml` (it's gitignored). The commit guards will stop you. |

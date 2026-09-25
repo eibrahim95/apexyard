@@ -316,8 +316,8 @@ mock_gh_set_repo_existence "$SB" 99 me2resh/apexyard-premium yes
 mock_gh_set_repo_existence "$SB" 99 me2resh/apexyard no
 mock_gh_set_repo_existence "$SB" 99 fork-org/apexyard no
 BODY_FILE="$SB/body.md"
-printf '%s' "$VALID_BODY" > "$BODY_FILE"
-CMD="gh pr create --repo me2resh/apexyard-premium --base main --title 'fix(#99): sibling ticket' --body-file $BODY_FILE --head fix/GH-464-cross-repo"
+printf '%s\n\nCloses #99' "$VALID_BODY" > "$BODY_FILE"
+CMD="gh pr create --repo me2resh/apexyard-premium --base main --title 'fix(hooks): sibling ticket' --body-file $BODY_FILE --head fix/GH-464-cross-repo"
 INPUT=$(jq -nc --arg c "$CMD" '{tool_input:{command:$c}}')
 STDERR=$(cd "$SB" && echo "$INPUT" | bash .claude/hooks/validate-pr-create.sh 2>&1 >/dev/null)
 RC=$?
@@ -332,8 +332,8 @@ mock_gh_set_repo_existence "$SB" 77 me2resh/apexyard-premium yes
 mock_gh_set_repo_existence "$SB" 77 fork-org/apexyard no
 mock_gh_set_state "$SB" 77 CLOSED
 BODY_FILE="$SB/body.md"
-printf '%s' "$VALID_BODY" > "$BODY_FILE"
-CMD="gh pr create --repo me2resh/apexyard-premium --base main --title 'fix(#77): closed sibling ticket' --body-file $BODY_FILE --head fix/GH-464-cross-repo"
+printf '%s\n\nCloses #77' "$VALID_BODY" > "$BODY_FILE"
+CMD="gh pr create --repo me2resh/apexyard-premium --base main --title 'fix(hooks): closed sibling ticket' --body-file $BODY_FILE --head fix/GH-464-cross-repo"
 INPUT=$(jq -nc --arg c "$CMD" '{tool_input:{command:$c}}')
 STDERR=$(cd "$SB" && echo "$INPUT" | bash .claude/hooks/validate-pr-create.sh 2>&1 >/dev/null)
 RC=$?
@@ -350,8 +350,8 @@ mock_gh_set_repo_existence "$SB" 55 me2resh/apexyard yes
 mock_gh_set_repo_existence "$SB" 55 me2resh/apexyard-premium no
 mock_gh_set_repo_existence "$SB" 55 fork-org/apexyard no
 BODY_FILE="$SB/body.md"
-printf '%s' "$VALID_BODY" > "$BODY_FILE"
-CMD="gh pr create --repo me2resh/apexyard-premium --base main --title 'fix(#55): framework ticket in wrong tracker' --body-file $BODY_FILE --head fix/GH-464-cross-repo"
+printf '%s\n\nCloses #55' "$VALID_BODY" > "$BODY_FILE"
+CMD="gh pr create --repo me2resh/apexyard-premium --base main --title 'fix(hooks): framework ticket in wrong tracker' --body-file $BODY_FILE --head fix/GH-464-cross-repo"
 INPUT=$(jq -nc --arg c "$CMD" '{tool_input:{command:$c}}')
 STDERR=$(cd "$SB" && echo "$INPUT" | bash .claude/hooks/validate-pr-create.sh 2>&1 >/dev/null)
 RC=$?
@@ -362,8 +362,8 @@ assert_case "B3: --repo=sibling, ticket in ops-fork upstream only → BLOCK (no 
 SB=$(make_validate_sandbox "fork-org/apexyard" "" "fix/GH-464-regression")
 mock_gh_install "$SB"
 BODY_FILE="$SB/body.md"
-printf '%s' "$VALID_BODY" > "$BODY_FILE"
-CMD="gh pr create --repo fork-org/apexyard --base dev --title 'fix(#42): framework ticket' --body-file $BODY_FILE --head fix/GH-464-regression"
+printf '%s\n\nCloses #42' "$VALID_BODY" > "$BODY_FILE"
+CMD="gh pr create --repo fork-org/apexyard --base dev --title 'fix(hooks): framework ticket' --body-file $BODY_FILE --head fix/GH-464-regression"
 INPUT=$(jq -nc --arg c "$CMD" '{tool_input:{command:$c}}')
 STDERR=$(cd "$SB" && echo "$INPUT" | bash .claude/hooks/validate-pr-create.sh 2>&1 >/dev/null)
 RC=$?
@@ -382,8 +382,8 @@ mock_gh_install "$SB"
 mock_gh_set_repo_existence "$SB" 207 me2resh/apexyard yes
 mock_gh_set_repo_existence "$SB" 207 fork-org/apexyard no
 BODY_FILE="$SB/body.md"
-printf '%s' "$VALID_BODY" > "$BODY_FILE"
-CMD="gh pr create --repo me2resh/apexyard --base dev --title 'fix(#207): upstream issue' --body-file $BODY_FILE --head fix/GH-464-upstream"
+printf '%s\n\nCloses #207' "$VALID_BODY" > "$BODY_FILE"
+CMD="gh pr create --repo me2resh/apexyard --base dev --title 'fix(hooks): upstream issue' --body-file $BODY_FILE --head fix/GH-464-upstream"
 INPUT=$(jq -nc --arg c "$CMD" '{tool_input:{command:$c}}')
 STDERR=$(cd "$SB" && echo "$INPUT" | bash .claude/hooks/validate-pr-create.sh 2>&1 >/dev/null)
 RC=$?
@@ -415,9 +415,9 @@ mock_gh_install "$SB"
 mock_gh_set_repo_existence "$SB" 300 me2resh/apexyard yes
 mock_gh_set_repo_existence "$SB" 300 fork-org/apexyard no
 BODY_FILE="$SB/body.md"
-printf '%s' "$VALID_BODY" > "$BODY_FILE"
+printf '%s\n\nCloses #300' "$VALID_BODY" > "$BODY_FILE"
 # PR targets the fork origin — this is the CMD_REPO == ORIGIN_LC allow-path.
-CMD="gh pr create --repo fork-org/apexyard --base dev --title 'fix(#300): upstream-only ticket, targeting fork origin' --body-file $BODY_FILE --head fix/GH-464-b6"
+CMD="gh pr create --repo fork-org/apexyard --base dev --title 'fix(hooks): upstream-only ticket, targeting fork origin' --body-file $BODY_FILE --head fix/GH-464-b6"
 INPUT=$(jq -nc --arg c "$CMD" '{tool_input:{command:$c}}')
 STDERR=$(cd "$SB" && echo "$INPUT" | bash .claude/hooks/validate-pr-create.sh 2>&1 >/dev/null)
 RC=$?
@@ -434,8 +434,8 @@ mock_gh_set_repo_existence "$SB" 88 me2resh/apexyard-premium yes
 mock_gh_set_repo_existence "$SB" 88 me2resh/apexyard no
 mock_gh_set_repo_existence "$SB" 88 fork-org/apexyard no
 BODY_FILE="$SB/body.md"
-printf '%s' "$VALID_BODY" > "$BODY_FILE"
-CMD="gh pr create --repo=me2resh/apexyard-premium --base main --title 'fix(#88): equals form ticket' --body-file $BODY_FILE --head fix/GH-464-f1-b7"
+printf '%s\n\nCloses #88' "$VALID_BODY" > "$BODY_FILE"
+CMD="gh pr create --repo=me2resh/apexyard-premium --base main --title 'fix(hooks): equals form ticket' --body-file $BODY_FILE --head fix/GH-464-f1-b7"
 INPUT=$(jq -nc --arg c "$CMD" '{tool_input:{command:$c}}')
 STDERR=$(cd "$SB" && echo "$INPUT" | bash .claude/hooks/validate-pr-create.sh 2>&1 >/dev/null)
 RC=$?
@@ -449,8 +449,8 @@ mock_gh_set_repo_existence "$SB" 88 me2resh/apexyard-premium yes
 mock_gh_set_repo_existence "$SB" 88 me2resh/apexyard no
 mock_gh_set_repo_existence "$SB" 88 fork-org/apexyard no
 BODY_FILE="$SB/body.md"
-printf '%s' "$VALID_BODY" > "$BODY_FILE"
-CMD="gh pr create -R me2resh/apexyard-premium --base main --title 'fix(#88): short alias ticket' --body-file $BODY_FILE --head fix/GH-464-f1-b8"
+printf '%s\n\nCloses #88' "$VALID_BODY" > "$BODY_FILE"
+CMD="gh pr create -R me2resh/apexyard-premium --base main --title 'fix(hooks): short alias ticket' --body-file $BODY_FILE --head fix/GH-464-f1-b8"
 INPUT=$(jq -nc --arg c "$CMD" '{tool_input:{command:$c}}')
 STDERR=$(cd "$SB" && echo "$INPUT" | bash .claude/hooks/validate-pr-create.sh 2>&1 >/dev/null)
 RC=$?
@@ -464,8 +464,8 @@ mock_gh_set_repo_existence "$SB" 88 me2resh/apexyard-premium yes
 mock_gh_set_repo_existence "$SB" 88 me2resh/apexyard no
 mock_gh_set_repo_existence "$SB" 88 fork-org/apexyard no
 BODY_FILE="$SB/body.md"
-printf '%s' "$VALID_BODY" > "$BODY_FILE"
-CMD="gh pr create -R=me2resh/apexyard-premium --base main --title 'fix(#88): short-alias-equals ticket' --body-file $BODY_FILE --head fix/GH-464-f1-b9"
+printf '%s\n\nCloses #88' "$VALID_BODY" > "$BODY_FILE"
+CMD="gh pr create -R=me2resh/apexyard-premium --base main --title 'fix(hooks): short-alias-equals ticket' --body-file $BODY_FILE --head fix/GH-464-f1-b9"
 INPUT=$(jq -nc --arg c "$CMD" '{tool_input:{command:$c}}')
 STDERR=$(cd "$SB" && echo "$INPUT" | bash .claude/hooks/validate-pr-create.sh 2>&1 >/dev/null)
 RC=$?
@@ -524,8 +524,8 @@ mock_gh_set_repo_existence "$SB_C2" 99 me2resh/apexyard-premium yes
 mock_gh_set_repo_existence "$SB_C2" 99 me2resh/apexyard no
 mock_gh_set_repo_existence "$SB_C2" 99 fork-org/apexyard no
 BODY_FILE_C2="$SB_C2/body.md"
-printf '%s' "$VALID_BODY" > "$BODY_FILE_C2"
-CMD_C2="gh pr create --repo me2resh/apexyard-premium --base main --title 'fix(#99): sibling' --body-file $BODY_FILE_C2 --head fix/GH-464-c2"
+printf '%s\n\nCloses #99' "$VALID_BODY" > "$BODY_FILE_C2"
+CMD_C2="gh pr create --repo me2resh/apexyard-premium --base main --title 'fix(hooks): sibling' --body-file $BODY_FILE_C2 --head fix/GH-464-c2"
 INPUT_C2=$(jq -nc --arg c "$CMD_C2" '{tool_input:{command:$c}}')
 # Remove the lib from the sandbox copy.
 rm -f "$SB_C2/.claude/hooks/_lib-pr-repo.sh"

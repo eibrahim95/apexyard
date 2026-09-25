@@ -26,7 +26,7 @@ A good commit message turns a 30-minute git-archaeology session into a 30-second
 
 When reviewing a PR, surface a finding when:
 
-1. The PR has a commit whose subject is fewer than 10 characters of meaningful text after the `type(#N):` prefix (e.g. `chore(#42): fix`, `feat(#42): wip`, `refactor(#42): cleanup`).
+1. The PR has a commit whose subject is fewer than 10 characters of meaningful text after the `type(scope):` prefix (e.g. `chore(hooks): fix`, `feat(auth): wip`, `refactor(api): cleanup`).
 2. The PR has a commit with no body AND the diff is >50 lines (small fixes can get away with subject-only; substantive changes deserve a body).
 3. The commit body is a one-liner restating the subject (e.g. subject `feat(#42): add user export`, body `Adds user export.`). This is the WHAT-not-WHY pattern.
 4. The commit message contains placeholder text — `<description>`, `TODO`, `XXX`, `[fill in]`, etc.

@@ -16,15 +16,12 @@ The `TICKET-ID` should reference an issue in the project's tracker. Default form
 
 ## PR Title Format
 
-Must match: `type(TICKET): description` or `type(TICKET)!: description` (breaking change)
+Must match: `type(scope): description` or `type(scope)!: description` (breaking change). The scope is a lowercase component name, for example `feat(auth): add session refresh`. See AgDR-0165.
 
-Regex: `^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|spike|prototype)\(<TICKET_ID_PATTERN>\)!?:`
+Link the ticket in the PR body with a closing keyword: `Closes #58` (GitHub Issues) or `Closes ABC-123` (Jira / Linear / similar). The validator checks that the ticket exists and is open. Use a bare `#N`; a cross-repo `owner/repo#N` does not count.
 
-`<TICKET_ID_PATTERN>` is sourced from `.tracker.id_pattern` so adopters get their own tracker's shape validation. Default matches `#123`, `GH-123`, or `[A-Z]{2,10}-[0-9]+` (Jira / Linear / similar).
-
-- One ticket ID per PR title — multi-ticket titles like `fix(ABC-1,2,3):` are rejected
-- GitHub Issues use `#XX` format: `fix(#58): description`
-- Breaking changes use `!` before the colon: `feat(#58)!: remove deprecated v1 endpoints`
+- One ticket per PR
+- Breaking changes use `!` before the colon: `feat(api)!: remove deprecated v1 endpoints`
 
 ## Commit Message Format
 

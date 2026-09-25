@@ -1,11 +1,11 @@
 #!/bin/bash
 # Validates PR creation:
-# - PR title matches format: type(TICKET): description
+# - PR title matches format: type(scope): description
+# - PR body links a ticket with a closing keyword (Closes #N)
 # - PR body contains a Glossary section
 # - Branch has a ticket ID
-# - The ticket referenced in the title actually exists in the tracker repo
-#   (backstop for the ticket-vocabulary rule — catches fabricated #N that
-#   slipped through prose into a PR title)
+# - The ticket linked in the body actually exists in the tracker repo
+#   (backstop for the ticket-vocabulary rule — catches fabricated #N)
 #
 # Customize the ticket pattern below if your team uses a different scheme.
 
@@ -42,7 +42,7 @@ if [ -z "$TITLE" ]; then
 fi
 
 # Validate PR title format if we can extract it
-# Accepts: type(<TICKET>): … or type(<TICKET>)!: … (breaking change)
+# Accepts: type(<scope>): … or type(<scope>)!: … (breaking change)
 # The !? makes the breaking-change marker optional per Conventional Commits 1.0.
 #
 # The accepted type list is project-configurable via .claude/project-config.json
@@ -79,14 +79,26 @@ if [ -z "$PR_TYPES" ]; then
   PR_TYPES="feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert"
 fi
 
+BODY_CONTENT=""
+BODY_FILE=$(echo "$COMMAND" | sed -nE 's/.*--body-file[[:space:]]+([^[:space:]]+).*/\1/p' | head -1)
+if [ -n "$BODY_FILE" ] && [ -f "$BODY_FILE" ]; then
+  BODY_CONTENT=$(cat "$BODY_FILE")
+fi
+
 TICKET_REF=""
 if [ -n "$TITLE" ]; then
-  if ! echo "$TITLE" | grep -qE "^(${PR_TYPES})\(([A-Z]{2,10}-[0-9]+|#[0-9]+)\)!?:"; then
-    ERRORS="${ERRORS}PR title '$TITLE' doesn't match format: type(TICKET-ID): description\n"
+  # The scope names a component (lowercase), not a ticket. AgDR-0165.
+  if ! echo "$TITLE" | grep -qE "^(${PR_TYPES})\([a-z][a-z0-9._-]*\)!?:"; then
+    ERRORS="${ERRORS}PR title '$TITLE' doesn't match format: type(scope): description\n"
+    ERRORS="${ERRORS}The scope is a lowercase component name, e.g. feat(auth): ... Put the ticket in the body as 'Closes #N'.\n"
     ERRORS="${ERRORS}Accepted types (from .claude/project-config.*.json → .pr.title_type_whitelist): ${PR_TYPES//|/, }\n"
-  else
-    # Extract the ticket reference so we can verify it exists
-    TICKET_REF=$(echo "$TITLE" | sed -nE 's/^[a-z]+\(([^)]+)\):.*/\1/p')
+  fi
+  # The ticket lives in the body: first closing keyword + #N or PREFIX-N.
+  TICKET_REF=$(printf '%s\n%s\n' "$BODY_CONTENT" "$COMMAND" | \
+    grep -oiE '\b(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]]+(#[0-9]+|[A-Z]{2,10}-[0-9]+)\b' | \
+    head -1 | grep -oE '(#[0-9]+|[A-Z]{2,10}-[0-9]+)$')
+  if [ -z "$TICKET_REF" ]; then
+    ERRORS="${ERRORS}PR body doesn't link a ticket. Add a closing keyword such as 'Closes #N' (cross-repo 'owner/repo#N' is not accepted).\n"
   fi
 fi
 
@@ -185,7 +197,7 @@ if [ -n "$TICKET_REF" ]; then
         NOT_FOUND_LOC="${TRACKER_REPO}"
       fi
       cat >&2 <<MSG
-BLOCKED: PR title references ${TICKET_REF} but issue #${TICKET_NUM} does not
+BLOCKED: PR body references ${TICKET_REF} but issue #${TICKET_NUM} does not
 exist in ${NOT_FOUND_LOC}.
 
 This is the failure mode the ticket-vocabulary rule exists to prevent — do NOT
@@ -195,7 +207,7 @@ See .claude/rules/ticket-vocabulary.md § "The rule".
 If you intended to create the PR for a real ticket, verify the number.
 If you were about to file work that has no ticket yet, create one first:
   gh issue create --repo ${TRACKER_REPO} --title "..."
-and use the returned number in your PR title.
+and use the returned number in your PR body (Closes #N).
 MSG
       exit 2
     fi
@@ -213,7 +225,7 @@ MSG
     esac
     if [ "$IS_CLOSED" = "1" ]; then
       cat >&2 <<MSG
-BLOCKED: PR title references ${TICKET_REF} but issue #${TICKET_NUM} in
+BLOCKED: PR body references ${TICKET_REF} but issue #${TICKET_NUM} in
 ${MATCHED_REPO} is CLOSED.
 
 Every PR needs its own OPEN ticket. Referencing a closed issue means the PR
@@ -223,11 +235,11 @@ through the SDLC states — the ticket is already Done.
 Common causes:
   - The work is a follow-up to the closed issue → create a NEW ticket that
     describes the follow-up, link back to the closed one in the body, and
-    use the new number in the PR title.
+    use the new number in the PR body.
   - The closed issue was auto-closed by a prior PR that didn't fully finish
     the work → re-open it (gh issue reopen ${TICKET_NUM} --repo ${MATCHED_REPO})
     or create a new ticket for the remaining work.
-  - The number is a typo → fix the PR title.
+  - The number is a typo → fix the PR body.
 
 See .claude/rules/ticket-vocabulary.md and the "every PR needs its own open
 ticket" feedback in memory.
@@ -249,12 +261,6 @@ fi
 # Skip marker: the literal `.pr.skip_marker` string in the body bypasses
 # the check with a visible stderr WARN. Default marker is
 # `<!-- pr-sections: skip -->`.
-BODY_CONTENT=""
-BODY_FILE=$(echo "$COMMAND" | sed -nE 's/.*--body-file[[:space:]]+([^[:space:]]+).*/\1/p' | head -1)
-if [ -n "$BODY_FILE" ] && [ -f "$BODY_FILE" ]; then
-  BODY_CONTENT=$(cat "$BODY_FILE")
-fi
-
 if echo "$COMMAND" | grep -qE '\-\-body(-file)?\b'; then
   # Combined haystack — scan both the file content (if --body-file) and the
   # raw command (so inline --body "..." also matches).

@@ -177,7 +177,9 @@ if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
 fi
 exit 0
 '
-cmd='gh pr create --title "feat(#42): add csv export" --body "
+cmd='gh pr create --title "feat(hooks): add csv export" --body "
+Closes #42
+
 ## Testing
 verify
 
@@ -205,7 +207,9 @@ if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
 fi
 exit 0
 '
-cmd='gh pr create --title "feat(#9999): missing ticket" --body "
+cmd='gh pr create --title "feat(hooks): missing ticket" --body "
+Closes #9999
+
 ## Testing
 x
 
@@ -245,7 +249,9 @@ fi
 exit 0
 '
 # Linear: no --repo flag in command; PR is still gh-shaped (gh pr create).
-cmd='gh pr create --title "feat(LIN-42): linear ticket" --body "
+cmd='gh pr create --title "feat(hooks): linear ticket" --body "
+Closes LIN-42
+
 ## Testing
 x
 
@@ -268,7 +274,9 @@ if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
 fi
 exit 0
 '
-cmd='gh pr create --title "feat(LIN-50): linear closed" --body "
+cmd='gh pr create --title "feat(hooks): linear closed" --body "
+Closes LIN-50
+
 ## Testing
 x
 
@@ -292,7 +300,9 @@ fi
 # (Closed-state Linear tickets still block — see the "Done" case above — and
 # gh fabricated #N still blocks — see Case 12.)
 install_mock "$SB" linear 'exit 1'
-cmd='gh pr create --title "feat(LIN-99): unqueryable" --body "
+cmd='gh pr create --title "feat(hooks): unqueryable" --body "
+Closes LIN-99
+
 ## Testing
 x
 
@@ -330,7 +340,9 @@ if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
 fi
 exit 0
 '
-cmd='gh pr create --title "feat(JIRA-100): jira ticket" --body "
+cmd='gh pr create --title "feat(hooks): jira ticket" --body "
+Closes JIRA-100
+
 ## Testing
 x
 
@@ -353,7 +365,9 @@ if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
 fi
 exit 0
 '
-cmd='gh pr create --title "feat(JIRA-200): jira closed" --body "
+cmd='gh pr create --title "feat(hooks): jira closed" --body "
+Closes JIRA-200
+
 ## Testing
 x
 
@@ -388,7 +402,9 @@ JSON
 # Provide a stub that always fails so an accidental call is detectable.
 install_mock "$SB" gh 'exit 99'
 
-cmd='gh pr create --title "feat(#99999): no-tracker mode" --body "
+cmd='gh pr create --title "feat(hooks): no-tracker mode" --body "
+Closes #99999
+
 ## Testing
 x
 
@@ -435,7 +451,9 @@ num="$1"
 printf "{\"state\":\"open\",\"title\":\"mock %s\",\"url\":\"https://my/%s\",\"labels\":[]}\n" "$num" "$num"
 exit 0
 '
-cmd='gh pr create --title "feat(TIC-7): custom" --body "
+cmd='gh pr create --title "feat(hooks): custom" --body "
+Closes TIC-7
+
 ## Testing
 x
 
@@ -788,7 +806,9 @@ JSON
 # Mock linear CLI that always fails (CLI absent / unauthenticated / not
 # queryable from this environment) — tracker_view returns empty.
 install_mock "$SB" linear 'exit 1'
-cmd='gh pr create --title "feat(LIN-77): real linear ticket" --body "
+cmd='gh pr create --title "feat(hooks): real linear ticket" --body "
+Closes LIN-77
+
 ## Testing
 x
 
@@ -863,7 +883,9 @@ if [ "$1" = "issue" ] && [ "$2" = "view" ]; then
 fi
 exit 0
 '
-cmd='gh pr create --title "feat(#88888): missing gh ticket" --body "
+cmd='gh pr create --title "feat(hooks): missing gh ticket" --body "
+Closes #88888
+
 ## Testing
 x
 
