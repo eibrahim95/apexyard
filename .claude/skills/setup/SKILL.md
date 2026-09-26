@@ -482,16 +482,17 @@ Which harness(es) do you run ApexYard with?
   [3] pi (pi.dev)
   [4] Codex
   [5] Cursor
-  [6] Other / not sure
+  [6] Zed
+  [7] Other / not sure
 
-[1-6, comma-separated for more than one — default 1]
+[1-7, comma-separated for more than one — default 1]
 ```
 
 **Branch on the answer:**
 
 - **1 / default / empty** → print nothing further, continue straight to Step 3. This is the zero-friction path — most adopters are on Claude Code and shouldn't see any more text.
-- **6** → print one line — *"No adapter for that harness yet. The mechanical gates (`.claude/hooks/*.sh`) are portable bash; see `docs/harnesses/README.md` § 'Adapter-authoring pattern for future harnesses' if you want to write one."* — then continue to Step 3.
-- **2 / 3 / 4 / 5 (one or more)** → for each selected harness, print its install command + its one precondition, sourced from `docs/harnesses/README.md` (read it fresh rather than hardcoding — the matrix is the single source of truth and does change). Snapshot below. Refresh from the doc before printing:
+- **7** → print one line — *"No adapter for that harness yet. The mechanical gates (`.claude/hooks/*.sh`) are portable bash; see `docs/harnesses/README.md` § 'Adapter-authoring pattern for future harnesses' if you want to write one."* — then continue to Step 3.
+- **2 / 3 / 4 / 5 / 6 (one or more)** → for each selected harness, print its install command + its one precondition, sourced from `docs/harnesses/README.md` (read it fresh rather than hardcoding — the matrix is the single source of truth and does change). Snapshot below. Refresh from the doc before printing:
 
   | Harness | Install | Precondition | Tier |
   |---------|---------|---------------|------|
@@ -499,8 +500,9 @@ Which harness(es) do you run ApexYard with?
   | pi | `bash bin/install-pi-adapter.sh` | run pi headless with `-a` / `--approve` | ✅ live-proven |
   | Codex | `bash bin/sync-codex-adapter.sh` | grant hook-trust — `/hooks` interactively, `--dangerously-bypass-hook-trust` for a one-off headless run, or a user-level `~/.codex/hooks.json` | ✅ live-proven |
   | Cursor | `bash bin/install-cursor-adapter.sh` | enable third-party configs; leftover full adapter must be replaced | ✅ native in the IDE (2026-09-16). CLI ignores hooks. Not in conformance CI |
+  | Zed | native agent: `bash bin/sync-zed-adapter.sh` for skills, then `bash bin/install-zed-adapter.sh` once per machine for the tool-permission rules | trust the worktree so Zed loads project skills; ACP path: install Claude Agent from the ACP registry instead | ⚠️ native agent: degraded, no blocking gates except the tool-permission rules (verified 2026-09-26, Zed v1.21.0). Claude Agent over ACP enforces fully |
 
-  **Honesty is load-bearing here — never round a harness's tier up.** Print the current row from `docs/harnesses/README.md`. For Cursor, say native in the IDE, the `cursor-agent` CLI ignores hooks, a leftover full adapter can lock the session, and conformance CI has no headless path. Do not restore the retired failClosed-only claim.
+  **Honesty is load-bearing here — never round a harness's tier up.** Print the current row from `docs/harnesses/README.md`. For Cursor, say native in the IDE, the `cursor-agent` CLI ignores hooks, a leftover full adapter can lock the session, and conformance CI has no headless path. Do not restore the retired failClosed-only claim. For Zed, say the native agent has no lifecycle hooks, so every gate except the installed tool-permission rules is advisory. Name the Claude Agent over ACP path as the fully enforced option.
 
   For each selected harness, link the per-harness page for the full workflow: `docs/harnesses/<harness>.md` (e.g. `docs/harnesses/opencode.md`).
 
