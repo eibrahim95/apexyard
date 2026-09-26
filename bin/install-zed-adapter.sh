@@ -127,14 +127,17 @@ fi
 JSONC=0
 SOURCE_JSON="$SETTINGS"
 STRIPPED=""
-trap 'if [ -n "$STRIPPED" ]; then rm -f "$STRIPPED"; fi' EXIT
+# The trap removes the stripped copy and a merge result left by a failed step.
+# A successful write moves "$SETTINGS.tmp" away first, so the rm is a no-op.
+trap 'if [ -n "$STRIPPED" ]; then rm -f "$STRIPPED"; fi; rm -f "$SETTINGS.tmp"' EXIT
 
 strip_jsonc() {
-  # Pass 1 drops // and /* */ comments. Pass 2 drops a comma before } or ].
-  # Each pass matches whole string literals first and keeps them unchanged,
-  # so a "//" or "," inside a string value survives.
+  # Pass 1 replaces // and /* */ comments with a space, so `1/**/2` does not
+  # become `12`. Pass 2 drops a comma before } or ]. Each pass matches whole
+  # string literals first and keeps them unchanged, so a "//" or "," inside a
+  # string value survives.
   perl -0777 -pe '
-    s{("(?:[^"\\]|\\.)*")|//[^\n]*|/\*.*?\*/}{defined $1 ? $1 : ""}gse;
+    s{("(?:[^"\\]|\\.)*")|//[^\n]*|/\*.*?\*/}{defined $1 ? $1 : " "}gse;
     s{("(?:[^"\\]|\\.)*")|,(\s*[\}\]])}{defined $1 ? $1 : $2}gse;
   ' "$1"
 }
@@ -151,6 +154,14 @@ if ! jq empty "$SETTINGS" >/dev/null 2>&1; then
     echo "ERROR: $SETTINGS is not valid JSON or JSONC; refusing to modify it automatically. Inspect it by hand." >&2
     exit 1
   fi
+fi
+
+# jq accepts empty input, so an empty or comment-only file parses. The merge
+# then emits nothing, and a change check would report "installed" with no rules
+# present. Require an object at the top level, which is the only shape Zed uses.
+if ! jq -e 'type == "object"' "$SOURCE_JSON" >/dev/null 2>&1; then
+  echo "ERROR: $SETTINGS does not contain a JSON object at the top level; refusing to modify it automatically. Inspect it by hand." >&2
+  exit 1
 fi
 
 # merge_rules appends only the rules that are not already present, so a second
@@ -221,12 +232,22 @@ fi
 if [ "$JSONC" = "1" ]; then
   echo "$SETTINGS contains comments or trailing commas (JSONC)." >&2
   echo "The installer does not rewrite JSONC, because that would delete your comments." >&2
-  echo "Merge this block into $SETTINGS by hand. It is the complete terminal" >&2
-  echo "rule set, so it replaces agent.tool_permissions.tools.terminal:" >&2
+  if [ "$UNINSTALL" = "1" ]; then
+    echo "To remove ApexYard's rules, merge this block into $SETTINGS by hand." >&2
+  else
+    echo "To install ApexYard's rules, merge this block into $SETTINGS by hand." >&2
+  fi
+  echo "It is the complete terminal rule set, so it replaces" >&2
+  echo "agent.tool_permissions.tools.terminal. It keeps your own keys and rules" >&2
+  echo "there, but not the comments inside that object." >&2
   echo >&2
   jq '{agent: {tool_permissions: {tools: {terminal: .agent.tool_permissions.tools.terminal}}}}' "$SETTINGS.tmp" >&2
   echo >&2
-  echo "Then run bin/install-zed-adapter.sh --check to confirm." >&2
+  if [ "$UNINSTALL" = "1" ]; then
+    echo "Then run bin/install-zed-adapter.sh --check. It exits 1 once the rules are gone." >&2
+  else
+    echo "Then run bin/install-zed-adapter.sh --check to confirm." >&2
+  fi
   rm -f "$SETTINGS.tmp"
   exit 3
 fi

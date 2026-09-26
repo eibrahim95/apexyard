@@ -12,6 +12,7 @@
 #   - invalid JSON is refused without touching the file
 #   - a JSONC file (comments, trailing commas) is read for --check but never
 #     rewritten. An install that needs a change prints the block and exits 3.
+#   - an empty, comment-only, or non-object file is refused, never "installed"
 
 set -u
 
@@ -271,6 +272,53 @@ if grep -q 'http://localhost:8080' "$JSONC/settings.json" && grep -q '// ApexYar
 else
   mark_fail "string values containing // and the operator's comments are intact" "content lost"
 fi
+
+# A JSONC uninstall prints the removal block and removal-specific guidance.
+cp "$JSONC/settings.json" "$JSONC/installed-before.json"
+bash "$SCRIPT" --settings "$JSONC/settings.json" --uninstall >/tmp/_zed_install_jsonc_un.out 2>&1
+rc=$?
+if [ "$rc" = "3" ] && grep -q 'To remove ApexYard' /tmp/_zed_install_jsonc_un.out \
+  && grep -q 'exits 1 once the rules are gone' /tmp/_zed_install_jsonc_un.out \
+  && ! grep -q 'To install' /tmp/_zed_install_jsonc_un.out; then
+  mark_pass "a JSONC uninstall exits 3 with removal guidance"
+else
+  mark_fail "a JSONC uninstall exits 3 with removal guidance" "rc=$rc: $(cat /tmp/_zed_install_jsonc_un.out)"
+fi
+sed -n '/^{/,/^}/p' /tmp/_zed_install_jsonc_un.out > "$JSONC/un-snippet.json"
+assert_jq "$JSONC/un-snippet.json" '(.agent.tool_permissions.tools.terminal.always_deny | length == 0) and (.agent.tool_permissions.tools.terminal.always_confirm | length == 0)' "the JSONC uninstall block has no ApexYard rules"
+if diff -q "$JSONC/installed-before.json" "$JSONC/settings.json" >/dev/null 2>&1; then
+  mark_pass "a JSONC uninstall does not rewrite the file"
+else
+  mark_fail "a JSONC uninstall does not rewrite the file" "the settings file changed"
+fi
+
+# --- 5c. files with no top-level object are refused ----------------------
+# jq accepts empty input, so these once produced a false "installed" result.
+
+SHAPES="$TMPROOT/shapes"
+mkdir -p "$SHAPES"
+check_refused() {
+  local label="$1" content="$2" rc_check rc_install
+  printf '%s' "$content" > "$SHAPES/settings.json"
+  cp "$SHAPES/settings.json" "$SHAPES/before.json"
+  bash "$SCRIPT" --settings "$SHAPES/settings.json" --check >/tmp/_zed_install_shape.out 2>&1
+  rc_check=$?
+  bash "$SCRIPT" --settings "$SHAPES/settings.json" >>/tmp/_zed_install_shape.out 2>&1
+  rc_install=$?
+  if [ "$rc_check" = "1" ] && [ "$rc_install" = "1" ] \
+    && diff -q "$SHAPES/before.json" "$SHAPES/settings.json" >/dev/null 2>&1 \
+    && [ ! -e "$SHAPES/settings.json.tmp" ] && [ "$(backup_count "$SHAPES")" = "0" ]; then
+    mark_pass "$label is refused by --check and install, with no leftovers"
+  else
+    mark_fail "$label is refused by --check and install, with no leftovers" \
+      "check rc=$rc_check install rc=$rc_install: $(cat /tmp/_zed_install_shape.out)"
+  fi
+}
+check_refused "a comment-only file" $'// Zed settings\n// nothing else\n'
+check_refused "an empty file" ''
+check_refused "a top-level array" $'[1, 2]\n'
+# A comment between two tokens must not join them: `1/**/2` is not `12`.
+check_refused "a comment that would join two numbers" $'{ "a": 1/**/2 }\n'
 
 # --- 6. --uninstall removes exactly ApexYard's rules ---------------------
 
