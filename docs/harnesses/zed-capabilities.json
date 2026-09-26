@@ -101,6 +101,16 @@
       "adapter_use": "The adapter ships all skills; a growth past the cap would silently drop skills from the catalog."
     },
     {
+      "id": "skills.skill_file_size_limit",
+      "status": "unverified",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/skills",
+      "evidence": "No fetched source states a per-file limit. Zed v1.21.0 showed the error \"SKILL.md file exceeds maximum size of 100KB\" for a 109,268-byte handover SKILL.md (operator report, eibrahim95/apexyard#7).",
+      "adapter_use": "adapter_skills_export() fails generation when an exported SKILL.md exceeds 100,000 bytes, the smaller reading of 100KB.",
+      "on_change": "When a Zed source states the limit, record it here as supported and set ADAPTER_SKILL_MAX_BYTES in bin/_lib-adapter-skills.sh to match."
+    },
+    {
       "id": "skills.project_trust_gate",
       "status": "supported",
       "zed_version": "1.21.0",

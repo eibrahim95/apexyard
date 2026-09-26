@@ -32,10 +32,13 @@ set -u
 
 SRC_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
 SKILL_MD="$SRC_ROOT/.claude/skills/handover/SKILL.md"
+# The step 8.6 body lives in a reference file so SKILL.md stays under Zed's
+# 100KB SKILL.md limit (eibrahim95/apexyard#7).
+BADGE_MD="$SRC_ROOT/.claude/skills/handover/references/badge.md"
 AGDR="$SRC_ROOT/docs/agdr/AgDR-0090-handover-badge-offer.md"
 MULTI_DOC="$SRC_ROOT/docs/multi-project.md"
 
-for f in "$SKILL_MD" "$AGDR" "$MULTI_DOC"; do
+for f in "$SKILL_MD" "$BADGE_MD" "$AGDR" "$MULTI_DOC"; do
   if [ ! -f "$f" ]; then
     echo "FAIL: expected file missing: $f"
     exit 1
@@ -79,36 +82,36 @@ fi
 
 # 4. governed_by badge markdown (exact)
 GOVERNED_BADGE='[![Governed by ApexYard](https://img.shields.io/badge/governed_by-ApexYard-2F6DF6?style=flat-square)](https://github.com/me2resh/apexyard)'
-if grep -qF "$GOVERNED_BADGE" "$SKILL_MD"; then
+if grep -qF "$GOVERNED_BADGE" "$BADGE_MD"; then
   pass "governed_by badge markdown present verbatim"
 else
-  fail "governed_by badge markdown not found verbatim in SKILL.md"
+  fail "governed_by badge markdown not found verbatim in references/badge.md"
 fi
 
 # 5. built_with badge markdown (exact)
 BUILT_WITH_BADGE='[![Built with ApexYard](https://img.shields.io/badge/built_with-ApexYard-2F6DF6?style=flat-square)](https://github.com/me2resh/apexyard)'
-if grep -qF "$BUILT_WITH_BADGE" "$SKILL_MD"; then
+if grep -qF "$BUILT_WITH_BADGE" "$BADGE_MD"; then
   pass "built_with badge markdown present verbatim"
 else
-  fail "built_with badge markdown not found verbatim in SKILL.md"
+  fail "built_with badge markdown not found verbatim in references/badge.md"
 fi
 
 # 6. Brand color + style called out explicitly
-if grep -q '2F6DF6' "$SKILL_MD" && grep -q 'flat-square' "$SKILL_MD"; then
+if grep -q '2F6DF6' "$BADGE_MD" && grep -q 'flat-square' "$BADGE_MD"; then
   pass "brand color (2F6DF6) and flat-square style referenced"
 else
-  fail "brand color / flat-square style not referenced in SKILL.md"
+  fail "brand color / flat-square style not referenced in references/badge.md"
 fi
 
 # 7. Idempotency check documented
-if grep -qi 'Idempotency check' "$SKILL_MD" && grep -qi 'already present' "$SKILL_MD"; then
+if grep -qi 'Idempotency check' "$BADGE_MD" && grep -qi 'already present' "$BADGE_MD"; then
   pass "idempotency check documented"
 else
   fail "idempotency check (skip if already present) not documented"
 fi
 
 # 8. Branch + PR delivery, never a direct commit
-if grep -q 'Branch + PR, never a direct commit to the default branch' "$SKILL_MD"; then
+if grep -q 'Branch + PR, never a direct commit to the default branch' "$BADGE_MD"; then
   pass "branch+PR delivery documented (shared wording with AGENTS.md step)"
 else
   fail "branch + PR delivery wording not found for the badge step"

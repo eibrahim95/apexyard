@@ -62,6 +62,11 @@ adapter_skill_name_valid() {
 # be truncated silently. That shape does not exist in the tree today; if one
 # appears, this function fails loudly instead of corrupting the value — the
 # fix is to teach the projection about block scalars, not to drop them.
+#
+# A kept value that is unquoted and contains `: ` also fails. Strict YAML does
+# not allow that sequence in a plain scalar. Claude Code accepts it, but Zed
+# refuses to load the skill ("Invalid YAML frontmatter", Zed v1.21.0). The fix
+# is to quote the value in the source SKILL.md.
 adapter_skill_project_frontmatter() {
   local file="$1" tmp fields rc=0
   fields="$ADAPTER_SKILL_FIELDS"
@@ -85,7 +90,12 @@ adapter_skill_project_frontmatter() {
       if ($0 ~ /^[A-Za-z][A-Za-z0-9-]*:[[:space:]]*[>|]/) exit 3
       key = $0
       sub(/:.*/, "", key)
-      if (keep(key)) print
+      if (keep(key)) {
+        val = $0
+        sub(/^[^:]*:[[:space:]]*/, "", val)
+        if (val !~ /^["\047]/ && index(val, ": ") > 0) exit 4
+        print
+      }
       next
     }
     { print }
@@ -96,6 +106,7 @@ adapter_skill_project_frontmatter() {
     case "$rc" in
       2) echo "ERROR: $file does not start with YAML frontmatter; the shared skill export needs a name and a description to produce a loadable Zed/Codex skill. Add them, or exclude the file from .claude/skills." >&2 ;;
       3) echo "ERROR: $file uses a YAML block scalar in its frontmatter; the shared skill export cannot project it safely." >&2 ;;
+      4) echo "ERROR: $file has an unquoted frontmatter value that contains ': '; strict YAML parsers (Zed) reject it. Quote the value in the source SKILL.md." >&2 ;;
       *) echo "ERROR: failed to project frontmatter of $file (awk rc=$rc)." >&2 ;;
     esac
     return 1
@@ -104,13 +115,20 @@ adapter_skill_project_frontmatter() {
   mv "$tmp" "$file"
 }
 
+# Zed refuses to load a SKILL.md larger than 100KB ("SKILL.md file exceeds
+# maximum size of 100KB", observed in Zed v1.21.0; the Zed docs do not state
+# the limit). The byte ceiling below uses the smaller reading of "100KB" so the
+# check cannot pass a file Zed rejects. Move long reference material into a
+# sibling file in the skill folder instead of raising this number.
+ADAPTER_SKILL_MAX_BYTES=100000
+
 # adapter_skills_export <claude_skills_dir> <out_dir> — write the canonical
 # `.agents/skills` tree: one directory per skill in the source, every
 # `.claude/skills` path reference rewritten to `.agents/skills`, and each
 # SKILL.md frontmatter projected to the harness-neutral field set.
 adapter_skills_export() {
   local src="$1" dst="$2"
-  local src_dir dir name file fm_name
+  local src_dir dir name file fm_name size
 
   [ -d "$src" ] || { echo "ERROR: skills source not found: $src" >&2; return 1; }
   src_dir="$(cd "$src" && pwd)"
@@ -142,6 +160,11 @@ adapter_skills_export() {
     fm_name="$(awk '/^name:/ { sub(/^name:[[:space:]]*/, ""); sub(/[[:space:]]*$/, ""); print; exit }' "$file")"
     if [ "$fm_name" != "$name" ]; then
       echo "ERROR: skill '$name' declares name: '$fm_name' — the generated skill name must match its folder name." >&2
+      return 1
+    fi
+    size="$(wc -c < "$file" | tr -d '[:space:]')"
+    if [ "$size" -gt "$ADAPTER_SKILL_MAX_BYTES" ]; then
+      echo "ERROR: skill '$name' exports a SKILL.md of $size bytes; Zed refuses to load a SKILL.md larger than 100KB (limit used: $ADAPTER_SKILL_MAX_BYTES bytes). Move reference material into a sibling file in the skill folder." >&2
       return 1
     fi
   done
