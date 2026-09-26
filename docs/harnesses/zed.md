@@ -53,6 +53,8 @@ The adapter deliberately generates **no** hook files, agent files, or rule copie
 
 The deny patterns mirror `.claude/hooks/block-git-add-all.sh` and `.claude/hooks/block-unreviewed-merge.sh`, so the rule is the same rule, expressed in the one place Zed can express it. Zed matches case-insensitively by default, so `git add -a` is caught too.
 
+Zed reads `settings.json` as JSONC, and its default file starts with `//` comments. The installer rewrites only a strict-JSON file. For a JSONC file, `--check` works as usual, but an install or uninstall that needs a change writes nothing. It prints the rule block to merge by hand and exits 3. A rewrite would delete your comments.
+
 ## How to generate and install
 
 ```bash

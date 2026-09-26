@@ -10,6 +10,8 @@
 #   - --check is read-only and detects a missing rule
 #   - --uninstall removes exactly ApexYard's rules
 #   - invalid JSON is refused without touching the file
+#   - a JSONC file (comments, trailing commas) is read for --check but never
+#     rewritten. An install that needs a change prints the block and exits 3.
 
 set -u
 
@@ -181,6 +183,93 @@ if diff -q "$BROKEN/before.json" "$BROKEN/settings.json" >/dev/null 2>&1; then
   mark_pass "a refused install leaves the file untouched"
 else
   mark_fail "a refused install leaves the file untouched" "the settings file changed"
+fi
+
+# --- 5b. JSONC (Zed's default settings shape) is never rewritten --------
+
+JSONC="$TMPROOT/jsonc"
+mkdir -p "$JSONC"
+cat > "$JSONC/settings.json" <<'JSON'
+// Zed settings
+//
+// For information on how to configure Zed, see the Zed
+// documentation: https://zed.dev/docs/configuring-zed
+{
+  /* block comment */
+  "theme": "One Dark", // trailing comment
+  "base_keymap": "VSCode",
+  "proxy": "http://localhost:8080",
+}
+JSON
+cp "$JSONC/settings.json" "$JSONC/before.json"
+bash "$SCRIPT" --settings "$JSONC/settings.json" >/tmp/_zed_install_jsonc.out 2>&1
+rc=$?
+if [ "$rc" = "3" ]; then
+  mark_pass "a JSONC install exits 3 (manual step)"
+else
+  mark_fail "a JSONC install exits 3 (manual step)" "rc=$rc: $(cat /tmp/_zed_install_jsonc.out)"
+fi
+if diff -q "$JSONC/before.json" "$JSONC/settings.json" >/dev/null 2>&1; then
+  mark_pass "a JSONC file is not rewritten, so comments survive"
+else
+  mark_fail "a JSONC file is not rewritten, so comments survive" "the settings file changed"
+fi
+if [ "$(backup_count "$JSONC")" = "0" ] && [ ! -e "$JSONC/settings.json.tmp" ]; then
+  mark_pass "a JSONC install leaves no backup or temp file"
+else
+  mark_fail "a JSONC install leaves no backup or temp file" "found leftovers in $JSONC"
+fi
+# The printed block must be valid JSON that carries all five rules.
+sed -n '/^{/,/^}/p' /tmp/_zed_install_jsonc.out > "$JSONC/snippet.json"
+assert_jq "$JSONC/snippet.json" '(.agent.tool_permissions.tools.terminal.always_deny | length == 3) and (.agent.tool_permissions.tools.terminal.always_confirm | length == 2)' "the JSONC install prints a paste-ready block with all rules"
+
+if bash "$SCRIPT" --settings "$JSONC/settings.json" --check >/dev/null 2>&1; then
+  mark_fail "--check reads a JSONC file and reports missing rules" "expected non-zero exit"
+else
+  mark_pass "--check reads a JSONC file and reports missing rules"
+fi
+
+# Paste the printed block into the JSONC file, keeping the comments.
+cat > "$JSONC/settings.json" <<'JSON'
+// Zed settings
+{
+  // ApexYard rules pasted by hand
+  "agent": {
+    "tool_permissions": {
+      "tools": {
+        "terminal": {
+          "always_deny": [
+            { "pattern": "\\bgit\\s+add\\s+(-A|--all|\\.)(\\s|$)" },
+            { "pattern": "\\bgh\\s+pr\\s+merge\\b" },
+            { "pattern": "\\bgh\\s+api\\b.*/merge(\\s|$)" },
+          ],
+          "always_confirm": [
+            { "pattern": "\\bgh\\s+pr\\s+create\\b" },
+            { "pattern": "\\bgh\\s+issue\\s+create\\b" },
+          ],
+        },
+      },
+    },
+  },
+  "theme": "One Dark", // trailing comment
+  "proxy": "http://localhost:8080",
+}
+JSON
+if bash "$SCRIPT" --settings "$JSONC/settings.json" --check >/tmp/_zed_install_jsonc_check.out 2>&1; then
+  mark_pass "--check passes on a JSONC file after the block is pasted"
+else
+  mark_fail "--check passes on a JSONC file after the block is pasted" "$(cat /tmp/_zed_install_jsonc_check.out)"
+fi
+if bash "$SCRIPT" --settings "$JSONC/settings.json" >/tmp/_zed_install_jsonc_noop.out 2>&1 \
+  && grep -q 'already installed' /tmp/_zed_install_jsonc_noop.out; then
+  mark_pass "an installed JSONC file is a no-op, not a manual step"
+else
+  mark_fail "an installed JSONC file is a no-op, not a manual step" "$(cat /tmp/_zed_install_jsonc_noop.out)"
+fi
+if grep -q 'http://localhost:8080' "$JSONC/settings.json" && grep -q '// ApexYard rules pasted by hand' "$JSONC/settings.json"; then
+  mark_pass "string values containing // and the operator's comments are intact"
+else
+  mark_fail "string values containing // and the operator's comments are intact" "content lost"
 fi
 
 # --- 6. --uninstall removes exactly ApexYard's rules ---------------------

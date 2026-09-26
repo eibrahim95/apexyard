@@ -45,6 +45,10 @@ Options:
   --uninstall      Remove exactly ApexYard's rules, leaving everything else
                    alone. A timestamped backup is written first.
   -h, --help       Show this help.
+
+Zed allows comments and trailing commas in settings.json (JSONC). For a JSONC
+file, --check works as usual. An install or uninstall that needs a change
+writes nothing, prints the block to paste, and exits 3.
 USAGE
 }
 
@@ -115,9 +119,38 @@ if [ ! -f "$SETTINGS" ]; then
   printf '{}\n' > "$SETTINGS"
 fi
 
+# Zed reads settings.json as JSONC: comments and trailing commas are legal, and
+# the default file Zed creates starts with `//` comment lines. jq parses strict
+# JSON only, so a JSONC file is read through a stripped copy. The installer
+# never rewrites a JSONC file, because a jq round-trip would delete the
+# operator's comments. It prints the block to paste instead.
+JSONC=0
+SOURCE_JSON="$SETTINGS"
+STRIPPED=""
+trap 'if [ -n "$STRIPPED" ]; then rm -f "$STRIPPED"; fi' EXIT
+
+strip_jsonc() {
+  # Pass 1 drops // and /* */ comments. Pass 2 drops a comma before } or ].
+  # Each pass matches whole string literals first and keeps them unchanged,
+  # so a "//" or "," inside a string value survives.
+  perl -0777 -pe '
+    s{("(?:[^"\\]|\\.)*")|//[^\n]*|/\*.*?\*/}{defined $1 ? $1 : ""}gse;
+    s{("(?:[^"\\]|\\.)*")|,(\s*[\}\]])}{defined $1 ? $1 : $2}gse;
+  ' "$1"
+}
+
 if ! jq empty "$SETTINGS" >/dev/null 2>&1; then
-  echo "ERROR: $SETTINGS is not valid JSON; refusing to modify it automatically. Inspect it by hand." >&2
-  exit 1
+  if command -v perl >/dev/null 2>&1; then
+    STRIPPED="$(mktemp "${TMPDIR:-/tmp}/zed-settings-stripped.XXXXXX")"
+    strip_jsonc "$SETTINGS" > "$STRIPPED"
+  fi
+  if [ -n "$STRIPPED" ] && jq empty "$STRIPPED" >/dev/null 2>&1; then
+    JSONC=1
+    SOURCE_JSON="$STRIPPED"
+  else
+    echo "ERROR: $SETTINGS is not valid JSON or JSONC; refusing to modify it automatically. Inspect it by hand." >&2
+    exit 1
+  fi
 fi
 
 # merge_rules appends only the rules that are not already present, so a second
@@ -150,7 +183,7 @@ else
   FILTER="$merge_rules_filter"
 fi
 jq --argjson deny "$DENY_RULES" --argjson confirm "$CONFIRM_RULES" \
-  "$FILTER" "$SETTINGS" > "$SETTINGS.tmp"
+  "$FILTER" "$SOURCE_JSON" > "$SETTINGS.tmp"
 
 if ! jq empty "$SETTINGS.tmp" >/dev/null 2>&1; then
   rm -f "$SETTINGS.tmp"
@@ -159,7 +192,7 @@ if ! jq empty "$SETTINGS.tmp" >/dev/null 2>&1; then
 fi
 
 changed=0
-if ! diff -q <(jq -S . "$SETTINGS") <(jq -S . "$SETTINGS.tmp") >/dev/null 2>&1; then
+if ! diff -q <(jq -S . "$SOURCE_JSON") <(jq -S . "$SETTINGS.tmp") >/dev/null 2>&1; then
   changed=1
 fi
 
@@ -183,6 +216,19 @@ if [ "$changed" = "0" ]; then
   rm -f "$SETTINGS.tmp"
   echo "Zed tool-permission rules are already installed in $SETTINGS; nothing to change."
   exit 0
+fi
+
+if [ "$JSONC" = "1" ]; then
+  echo "$SETTINGS contains comments or trailing commas (JSONC)." >&2
+  echo "The installer does not rewrite JSONC, because that would delete your comments." >&2
+  echo "Merge this block into $SETTINGS by hand. It is the complete terminal" >&2
+  echo "rule set, so it replaces agent.tool_permissions.tools.terminal:" >&2
+  echo >&2
+  jq '{agent: {tool_permissions: {tools: {terminal: .agent.tool_permissions.tools.terminal}}}}' "$SETTINGS.tmp" >&2
+  echo >&2
+  echo "Then run bin/install-zed-adapter.sh --check to confirm." >&2
+  rm -f "$SETTINGS.tmp"
+  exit 3
 fi
 
 BACKUP="$SETTINGS.bak-$(date +%Y%m%d%H%M%S)"
