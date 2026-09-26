@@ -9,6 +9,18 @@
 # committed; auto-cleaned when the agent finishes unchanged.
 .claude/worktrees/
 
+# Generated Agent Skills tree for the Zed and Codex adapters. Written from
+# .claude/skills by bin/sync-zed-adapter.sh and bin/sync-codex-adapter.sh on
+# each machine; kept untracked per AgDR-0088. Regenerate, never edit.
+.agents/
+
+# Split-portfolio v2: the live registry and project docs live in the private
+# sibling portfolio repository. projects/README.md is tracked framework content,
+# so it stays visible (same pattern as workspace/ below).
+/apexyard.projects.yaml
+/projects/*
+!/projects/README.md
+
 # Real onboarding config (#517). The tracked template is onboarding.example.yaml;
 # /setup copies it to onboarding.yaml (this file) and fills in real values that
 # must stay LOCAL — company name, internal URLs, tracker instance, named people.
