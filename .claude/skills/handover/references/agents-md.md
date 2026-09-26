@@ -2,7 +2,7 @@
 
 Step 8.5 of `.claude/skills/handover/SKILL.md` loads this file. It runs only when document row 8 was selected in step 5.6.
 
-#### Selection + preconditions
+## Selection + preconditions
 
 - **Selection condition**: run this step only when row 8 (`In-repo AGENTS.md`) was selected in step 5.6. It is **default-OFF** — the operator must consciously tick it (or name it in the comma-list, or pass `--all`). If not selected, skip silently and note `AGENTS.md: not selected` in the summary.
 - **Clone precondition**: a local clone is required to branch + PR. If `$CLONE_STATUS` is `declined` or `failed`, skip with a one-line note: `AGENTS.md: skipped (no local clone — re-run with the repo cloned into workspace/<name>/)`. The repo root is `$WORKSPACE_DIR/<name>/` (resolve via `portfolio_workspace_dir`).
@@ -25,7 +25,7 @@ Step 8.5 of `.claude/skills/handover/SKILL.md` loads this file. It runs only whe
 
   Default **N**. On anything other than an explicit yes, skip and note `AGENTS.md: declined` in the summary.
 
-#### Never-overwrite check (preserve, like the architecture stubs)
+## Never-overwrite check (preserve, like the architecture stubs)
 
 Before writing anything, check the target repo's working tree:
 
@@ -43,7 +43,7 @@ CLAUDE_EXISTS=no; [ -f "$REPO/CLAUDE.md" ] && CLAUDE_EXISTS=yes
 - If `AGENTS.md` is absent but `CLAUDE.md` exists → write `AGENTS.md` only; do **not** touch the existing `CLAUDE.md` (preserve it).
 - If both are absent → write `AGENTS.md` **and** a one-line `CLAUDE.md` that imports it.
 
-#### Compose `AGENTS.md` from the live assessment (NOT a generic template)
+## Compose `AGENTS.md` from the live assessment (NOT a generic template)
 
 Derive the content from what this handover already discovered (steps 2–5). Keep it focused on **stable** information — the things an agent needs to start working and that don't change every commit (commands, layout, conventions). Leave the volatile risk/integration analysis in `handover-assessment.md` (the role-split — see Rule 22). Use this shape:
 
@@ -95,7 +95,7 @@ Derive the content from what this handover already discovered (steps 2–5). Kee
 
 For **low-harnessability** repos (step 4.5 verdict `low`), the Conventions + Gotchas sections MUST surface what's fragile/missing (no strict types, no lint baseline, no coverage signal) rather than implying a maturity the repo doesn't have. This is the in-repo echo of the assessment's LOW warning — agents working in the repo need to know the guardrails aren't there.
 
-#### Write, branch, and open the PR
+## Write, branch, and open the PR
 
 All of this happens inside the target repo clone (`$REPO`), on a dedicated branch — never the default branch:
 
@@ -139,7 +139,7 @@ Notes:
 - This PR lives in the **target repo's** tracker/SDLC, not the ops fork's. The ops-fork merge gates (Rex/CEO markers) don't apply — this is the target repo's own review.
 - On `gh pr create` failure (issues disabled, no push rights, etc.): report the error and the branch name, leave the local branch in place, and continue to step 9. Do not retry.
 
-#### Record for the summary
+## Record for the summary
 
 ```bash
 AGENTS_MD_STATUS="PR opened: <url>"   # or "preserved" | "declined" | "not selected" | "skipped (no clone)" | "failed: <reason>"

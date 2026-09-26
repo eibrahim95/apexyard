@@ -2,7 +2,7 @@
 
 Step 8.6 of `.claude/skills/handover/SKILL.md` loads this file. It runs only when document row 9 was selected in step 5.6.
 
-#### Selection + preconditions
+## Selection + preconditions
 
 - **Selection condition**: run this step only when row 9 (`"Governed by ApexYard" badge`) was selected in step 5.6. It is **default-OFF** — the operator must consciously tick it (or name it in the comma-list). If not selected, skip silently and note `Badge: not selected` in the summary.
 - **Clone precondition**: a local clone is required to branch + PR. If `$CLONE_STATUS` is `declined` or `failed`, skip with a one-line note: `Badge: skipped (no local clone — re-run with the repo cloned into workspace/<name>/)`. The repo root is `$WORKSPACE_DIR/<name>/` (resolve via `portfolio_workspace_dir`).
@@ -21,7 +21,7 @@ Step 8.6 of `.claude/skills/handover/SKILL.md` loads this file. It runs only whe
 
   Default **N**. On anything other than an explicit yes, skip and note `Badge: declined` in the summary.
 
-#### Pick the variant (governed_by vs built_with)
+## Pick the variant (governed_by vs built_with)
 
 On a yes, offer the second badge variant for repos that were built with apexyard from the start rather than adopted into its governance after the fact:
 
@@ -46,7 +46,7 @@ Record the pick as `$BADGE_VARIANT` (`governed_by` or `built_with`). The two can
 
 Brand blue `#2F6DF6`, `flat-square` style — keep both fixed; don't invent a third variant or a different color/style on your own initiative.
 
-#### Idempotency check (never double-add)
+## Idempotency check (never double-add)
 
 Before writing anything, scan the target repo's README for either badge already present:
 
@@ -69,7 +69,7 @@ fi
 - **Badge already present (either variant)** → skip; note `Badge: skipped (already present)`. Never add a second badge or swap the existing variant — a human who wants to change variants edits the README directly.
 - Otherwise, proceed to insertion.
 
-#### Insert near the top of the README (idempotent, one line)
+## Insert near the top of the README (idempotent, one line)
 
 Insert the chosen badge markdown directly below the first top-level heading (`# Title`) in the README — the conventional badge position. If the README has no top-level heading, insert as the first line of the file.
 
@@ -84,7 +84,7 @@ awk -v badge="$BADGE_MARKDOWN" '
 
 (`$BADGE_MARKDOWN` is the exact snippet for `$BADGE_VARIANT` chosen above, passed in verbatim — do not reconstruct it inline in the `awk` script.)
 
-#### Write, branch, and open the PR
+## Write, branch, and open the PR
 
 Mirrors step 8.5's delivery mechanics. If step 8.5 already opened (or is about to open) a PR on `docs/agents-md` in this same run, prefer adding the badge commit onto that same branch/PR instead of opening a second trivial PR — ask once: `Add the badge to the same AGENTS.md PR (branch docs/agents-md), or open a separate PR? [same/separate — default same]`. Otherwise (no AGENTS.md PR this run), open a dedicated branch:
 
@@ -119,7 +119,7 @@ Notes:
 - This PR lives in the **target repo's** tracker/SDLC, not the ops fork's. The ops-fork merge gates (Rex/CEO markers) don't apply.
 - On `gh pr create` failure (issues disabled, no push rights, etc.): report the error and the branch name, leave the local branch in place, and continue to step 9. Do not retry.
 
-#### Record for the summary
+## Record for the summary
 
 ```bash
 BADGE_STATUS="PR opened: <url> (<variant>)"   # or "preserved (already present)" | "declined" | "not selected" | "skipped (no clone)" | "skipped (no README)" | "failed: <reason>"

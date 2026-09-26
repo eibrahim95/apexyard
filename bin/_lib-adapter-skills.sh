@@ -93,7 +93,7 @@ adapter_skill_project_frontmatter() {
       if (keep(key)) {
         val = $0
         sub(/^[^:]*:[[:space:]]*/, "", val)
-        if (val !~ /^["\047]/ && index(val, ": ") > 0) { bad_key = key; exit 4 }
+        if (val !~ /^["\047]/ && index(val, ": ") > 0) exit 4
         print
       }
       next
