@@ -13,8 +13,8 @@
 # Patterns are extended regular expressions, matched case-insensitively
 # against one line at a time. Each default pattern is anchored to the start
 # of a line, so prose that mentions a trailer mid-sentence does not match.
-# A human co-author trailer, such as `Co-authored-by: Jane <jane@x.org>`,
-# never matches.
+# A co-author trailer matches only on the Anthropic noreply address, so a
+# human co-author never matches, even one named Claude.
 #
 # Adopters replace the list via .claude/project-config.json →
 # .attribution.blocked_patterns. Arrays replace the inherited array
@@ -26,7 +26,6 @@ _ATTRIBUTION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # defaults file) so the matcher never silently degrades to "match nothing".
 # Keep in sync with .claude/project-config.defaults.json.
 _ATTRIBUTION_DEFAULT_PATTERNS=(
-  '^[[:space:]]*Co-authored-by:[[:space:]]*Claude([[:space:]<]|$)'
   '^[[:space:]]*Co-authored-by:.*noreply@anthropic\.com'
   '^[[:space:]]*Claude-Session:'
   '^[[:space:]]*(🤖[[:space:]]*)?Generated with \[?Claude Code'

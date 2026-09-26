@@ -37,7 +37,15 @@ CD_TARGET=$(printf '%s' "$COMMAND" | sed -nE 's/^[[:space:]]*cd[[:space:]]+("([^
 FILES=$(printf '%s\n' "$COMMAND" | grep -oE -- '(--body-file|--file|-F)[[:space:]=]+("[^"]+"|'\''[^'\'']+'\''|[^[:space:];&|]+)' \
   | sed -E 's/^(--body-file|--file|-F)[[:space:]=]+//; s/^["'\'']//; s/["'\'']$//')
 
-HAYSTACK="$COMMAND"
+# A trailer passed as its own argument, such as
+# `-m "Co-Authored-By: …"` or `--trailer "Co-authored-by: …"`, does not start
+# a line in the command text. Scan a second copy with a line break before
+# each message, trailer and body value so the anchored patterns see it.
+ARGS_SPLIT=$(printf '%s\n' "$COMMAND" | sed -E 's/(^|[[:space:]])(-m|--message|--trailer|--body|-b|--subject|-t)[[:space:]=]+["'\'']?/\
+/g')
+
+HAYSTACK="$COMMAND
+$ARGS_SPLIT"
 while IFS= read -r f; do
   [ -n "$f" ] || continue
   [ "$f" = "-" ] && continue

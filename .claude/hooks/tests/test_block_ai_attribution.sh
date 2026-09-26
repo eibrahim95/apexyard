@@ -48,6 +48,7 @@ done
 
 for line in "$HUMAN_TRAILER" \
             'Co-authored-by: Claudette Smith <c@example.com>' \
+            'Co-authored-by: Claude Dupont <claude@example.fr>' \
             '- Block the `Co-Authored-By: Claude` trailer in commits' \
             '- Remove the `Generated with Claude Code` footer' \
             'fix: stop agents adding Claude-Session: lines'; do
@@ -111,9 +112,14 @@ expect_block "cd + git commit -F relative file" "cd $TMP/proj && git commit -F m
 grep -q 'Remove these lines' "$TMP/stderr" && grep -qF "$CLAUDE_TRAILER" "$TMP/stderr" \
   && ok "hook message names the line" || fail "hook message names the line" "$(cat "$TMP/stderr")"
 
+expect_block "git commit with trailer as a second -m" "git commit -m 'feat: x' -m '$CLAUDE_TRAILER'"
+expect_block "git commit with --trailer" "git commit -m 'feat: x' --trailer \"$GH_SQUASH_TRAILER\""
+expect_block "gh pr merge --body with footer" "gh pr merge 5 --squash --body '$FOOTER'"
+
 expect_allow "git commit with human co-author" "git commit -m 'feat: x
 
 $HUMAN_TRAILER'"
+expect_allow "git commit with a human co-author named Claude" "git commit -m 'feat: x' --trailer 'Co-authored-by: Claude Dupont <claude@example.fr>'"
 expect_allow "commit that mentions the trailer mid-line" "git commit -m 'feat: x
 
 - Block the \`Co-Authored-By: Claude\` trailer and the \`Generated with Claude Code\` footer'"

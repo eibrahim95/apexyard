@@ -5,7 +5,6 @@
   "attribution": {
     "_comment": "AI attribution lines that agents must not put in commit messages or PR descriptions (#12, AgDR-0167). Each entry is an extended regular expression matched case-insensitively against one line. .githooks/commit-msg strips matching lines, block-ai-attribution.sh blocks agent commands that carry them, and /approve-merge strips them from the squash body. Arrays replace the inherited array wholesale, so copy the entries you want to keep when you override this list. A human trailer such as 'Co-authored-by: Jane <jane@example.com>' matches no default entry.",
     "blocked_patterns": [
-      "^[[:space:]]*Co-authored-by:[[:space:]]*Claude([[:space:]<]|$)",
       "^[[:space:]]*Co-authored-by:.*noreply@anthropic\\.com",
       "^[[:space:]]*Claude-Session:",
       "^[[:space:]]*(🤖[[:space:]]*)?Generated with \\[?Claude Code",

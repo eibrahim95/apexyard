@@ -30,7 +30,7 @@ Chosen: **harness setting + commit-msg strip + agent-command block, with one sha
 - `block-ai-attribution.sh` blocks `git commit`, `gh pr create`, `gh pr edit` and `gh pr merge` when the command text or a named message or body file carries a matching line. It fires in managed-project clones without `core.hooksPath`, and it still fires for `git commit --no-verify`.
 - `/approve-merge` passes an explicit squash subject and body built from the PR's commits with the lines removed.
 
-Each default pattern is anchored to the start of a line. Prose that mentions a trailer mid-sentence passes. A human co-author trailer matches no default pattern.
+Each default pattern is anchored to the start of a line. Prose that mentions a trailer mid-sentence passes. A co-author trailer matches only on the `noreply@anthropic.com` address, so a human co-author passes, even one named Claude. The hook also scans each `-m`, `--trailer` and `--body` value as the start of a line, so a trailer passed as its own argument is caught.
 
 ## Consequences
 
@@ -41,6 +41,8 @@ Each default pattern is anchored to the start of a line. Prose that mentions a t
 - Limits:
   - `git commit --no-verify` from a human, or a clone without `core.hooksPath`, skips the git-layer strip.
   - The agent-command block reads command text. A message built at run time, for example from a variable, can pass it.
+  - A footer on the same line as other body text, such as `--body "x 🤖 Generated with …"`, passes the anchored patterns.
+  - `dispatch-bash.sh` routes by command prefix. A `cd <dir> && git commit …` or `git -C <dir> commit …` command does not reach the hook. The existing commit gates have the same limit.
   - `tracker_pr_merge` honours the subject and body only on gh-kind projects. A glab-kind squash merge keeps the forge default body.
   - A harness can change its attribution text. The pattern list then needs an update.
 
