@@ -8,6 +8,7 @@
 #   - frontmatter projected to name/description/disable-model-invocation
 #   - approve-* keeps disable-model-invocation: true
 #   - invalid names, name/folder mismatches and block scalars fail loudly
+#   - unquoted `: ` in a kept value and a SKILL.md over 100KB fail loudly
 #   - --check detects drift and ignores non-owned files
 #   - the Codex and Zed generators share one export, in either order
 
@@ -261,6 +262,58 @@ elif grep -q 'YAML block scalar' /tmp/_zed_adapter_block_scalar.out; then
   mark_pass "block-scalar frontmatter fails generation"
 else
   mark_fail "block-scalar frontmatter fails generation" "$(cat /tmp/_zed_adapter_block_scalar.out)"
+fi
+
+# Strict YAML rejects `: ` inside an unquoted value; Zed refuses the skill
+# ("Invalid YAML frontmatter"). The export must fail instead (#7).
+PLAINCOLON="$TMPROOT/plain-colon"
+make_fixture "$PLAINCOLON"
+cat > "$PLAINCOLON/.claude/skills/status/SKILL.md" <<'MD'
+---
+name: status
+description: Initiative → tasks: per-milestone interview.
+---
+
+Body.
+MD
+if bash "$ZED_SCRIPT" --root "$PLAINCOLON" >/tmp/_zed_adapter_plain_colon.out 2>&1; then
+  mark_fail "unquoted ': ' in a frontmatter value fails generation" "expected non-zero exit"
+elif grep -q "unquoted frontmatter value that contains ': '" /tmp/_zed_adapter_plain_colon.out; then
+  mark_pass "unquoted ': ' in a frontmatter value fails generation"
+else
+  mark_fail "unquoted ': ' in a frontmatter value fails generation" "$(cat /tmp/_zed_adapter_plain_colon.out)"
+fi
+
+QUOTEDCOLON="$TMPROOT/quoted-colon"
+make_fixture "$QUOTEDCOLON"
+cat > "$QUOTEDCOLON/.claude/skills/status/SKILL.md" <<'MD'
+---
+name: status
+description: "Initiative → tasks: per-milestone interview."
+---
+
+Body.
+MD
+if bash "$ZED_SCRIPT" --root "$QUOTEDCOLON" >/tmp/_zed_adapter_quoted_colon.out 2>&1; then
+  mark_pass "quoted ': ' in a frontmatter value is accepted"
+else
+  mark_fail "quoted ': ' in a frontmatter value is accepted" "$(cat /tmp/_zed_adapter_quoted_colon.out)"
+fi
+
+# Zed refuses a SKILL.md larger than 100KB. The export must fail instead (#7).
+OVERSIZE="$TMPROOT/oversize"
+make_fixture "$OVERSIZE"
+{
+  printf '%s\n' '---' 'name: status' 'description: Current status.' '---' ''
+  head -c 100001 /dev/zero | tr '\0' 'x'
+  printf '\n'
+} > "$OVERSIZE/.claude/skills/status/SKILL.md"
+if bash "$ZED_SCRIPT" --root "$OVERSIZE" >/tmp/_zed_adapter_oversize.out 2>&1; then
+  mark_fail "oversized SKILL.md fails generation" "expected non-zero exit"
+elif grep -q 'Zed refuses to load a SKILL.md larger than 100KB' /tmp/_zed_adapter_oversize.out; then
+  mark_pass "oversized SKILL.md fails generation"
+else
+  mark_fail "oversized SKILL.md fails generation" "$(cat /tmp/_zed_adapter_oversize.out)"
 fi
 
 SYMLINK="$TMPROOT/symlink-escape"

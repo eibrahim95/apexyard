@@ -32,6 +32,9 @@ set -u
 
 SRC_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
 SKILL_MD="$SRC_ROOT/.claude/skills/handover/SKILL.md"
+# The step 5 assessment template lives in a reference file so SKILL.md stays
+# under Zed's 100KB SKILL.md limit (eibrahim95/apexyard#7).
+ASSESSMENT_MD="$SRC_ROOT/.claude/skills/handover/references/assessment-template.md"
 AGDR="$SRC_ROOT/docs/agdr/AgDR-0042-harnessability-scoring-dimensions.md"
 CLAUDE_MD="$SRC_ROOT/CLAUDE.md"
 MULTI_DOC="$SRC_ROOT/docs/multi-project.md"
@@ -126,7 +129,7 @@ fi
 # Case 6: assessment-file template includes a Harnessability assessment
 # section so the persisted artefact carries the score.
 # ---------------------------------------------------------------------------
-if grep -qE '^## Harnessability assessment' "$SKILL_MD"; then
+if grep -qE '^## Harnessability assessment' "$ASSESSMENT_MD"; then
   mark_pass "6. assessment-file template has a '## Harnessability assessment' section"
 else
   mark_fail "6. assessment-file section" "'## Harnessability assessment' not found in the assessment template"
