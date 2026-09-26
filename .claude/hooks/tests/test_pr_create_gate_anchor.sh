@@ -174,6 +174,22 @@ run_case 'a body with no closing reference BLOCKS' \
   "gh pr create --repo me2resh/apexyard --title 'fix(hooks): gate anchor' --head fix/GH-900-test --body-file $BF_NOREF" \
   2 "doesn't link a ticket"
 
+run_case 'a closing reference in the title does not count as the body link' \
+  "gh pr create --repo me2resh/apexyard --title 'fix(hooks): Closes #900' --head fix/GH-900-test --body-file $BF_NOREF" \
+  2 "doesn't link a ticket"
+
+BF_HIDDEN=$(mktemp /tmp/test-gate-anchor-hidden.XXXXXX.md)
+{ printf '<!-- Closes #900 -->\n```\nCloses #900\n```\n'; cat "$BF_NOREF"; } > "$BF_HIDDEN"
+run_case 'references inside an HTML comment or fenced code do not count' \
+  "gh pr create --repo me2resh/apexyard --title 'fix(hooks): gate anchor' --head fix/GH-900-test --body-file $BF_HIDDEN" \
+  2 "doesn't link a ticket"
+
+BF_UPPER=$(mktemp /tmp/test-gate-anchor-upper.XXXXXX.md)
+printf 'This fixes UTF-8 decoding.\n%s' "$BODY_OK" > "$BF_UPPER"
+run_case 'a #N reference wins over uppercase prose like "fixes UTF-8"' \
+  "gh pr create --repo me2resh/apexyard --title 'fix(hooks): gate anchor' --head fix/GH-900-test --body-file $BF_UPPER" \
+  0 ""
+
 run_case 'a leading cd prefix before a genuine gh pr create still validates' \
   "cd /tmp && gh pr create --repo me2resh/apexyard --title 'fix(hooks): gate anchor' --head fix/GH-900-test --body-file $BF_OK" \
   0 ""
@@ -288,7 +304,7 @@ run_case 'same shape (|) with an unquoted malformed title still BLOCKS' \
   "gh pr create --repo me2resh/apexyard --title fixbug --head fix/GH-900-test | cat" \
   2 "doesn't match format"
 
-rm -f "$BF_OK" "$BF_NOREF" "$BF_PROSE"
+rm -f "$BF_OK" "$BF_NOREF" "$BF_PROSE" "$BF_HIDDEN" "$BF_UPPER"
 
 echo ""
 echo "==================================="

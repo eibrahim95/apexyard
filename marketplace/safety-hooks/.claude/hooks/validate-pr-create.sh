@@ -93,17 +93,34 @@ if [ -n "$TITLE" ]; then
     ERRORS="${ERRORS}The scope is a lowercase component name, e.g. feat(auth): ... Put the ticket in the body as 'Closes #N'.\n"
     ERRORS="${ERRORS}Accepted types (from .claude/project-config.*.json → .pr.title_type_whitelist): ${PR_TYPES//|/, }\n"
   fi
-  # The ticket lives in the body: first closing keyword + #N or PREFIX-N.
-  TICKET_REF=$(printf '%s\n%s\n' "$BODY_CONTENT" "$COMMAND" | \
+  # The ticket lives in the body: a closing keyword + #N or PREFIX-N.
+  # Scans the body file and the raw command (inline --body) minus the title,
+  # after removing HTML comments and fenced code, which GitHub ignores.
+  # A #N match wins over PREFIX-N so prose such as "fixes UTF-8" can't
+  # shadow the real reference.
+  _refs=$(printf '%s\n%s\n' "$BODY_CONTENT" "${COMMAND/"$TITLE"/}" | awk '
+    /^[[:space:]]*(```|~~~)/ && !c { f = !f; next }
+    f { next }
+    {
+      line = $0; out = ""
+      while (1) {
+        if (c) { i = index(line, "-->"); if (!i) { line = ""; break }; line = substr(line, i + 3); c = 0 }
+        i = index(line, "<!--"); if (!i) break
+        out = out substr(line, 1, i - 1); line = substr(line, i + 4); c = 1
+      }
+      print out line
+    }' | \
     grep -oE '\b([Cc][Ll][Oo][Ss][Ee][SsDd]?|[Ff][Ii][Xx]([Ee][SsDd])?|[Rr][Ee][Ss][Oo][Ll][Vv][Ee][SsDd]?)[[:space:]]+(#[0-9]+|[A-Z]{2,10}-[0-9]+)\b' | \
-    head -1 | grep -oE '(#[0-9]+|[A-Z]{2,10}-[0-9]+)$')
+    grep -oE '(#[0-9]+|[A-Z]{2,10}-[0-9]+)$')
+  TICKET_REF=$(printf '%s\n' "$_refs" | grep -m1 '^#')
+  [ -z "$TICKET_REF" ] && TICKET_REF=$(printf '%s\n' "$_refs" | head -1)
   if [ -z "$TICKET_REF" ]; then
     ERRORS="${ERRORS}PR body doesn't link a ticket. Add a closing keyword such as 'Closes #N' (cross-repo 'owner/repo#N' is not accepted).\n"
   fi
 fi
 
-# Verify the ticket in the title actually exists in the tracker
-# (backstop for ticket-vocabulary.md — catches fabricated #N in PR titles).
+# Verify the ticket linked in the body actually exists in the tracker
+# (backstop for ticket-vocabulary.md — catches fabricated #N in PR bodies).
 #
 # Tracker-aware: uses `_lib-tracker.sh` for the existence check. Default
 # config (tracker.kind = gh) preserves today's behaviour exactly: dispatches
@@ -131,7 +148,7 @@ if [ -n "$TICKET_REF" ]; then
 
   # Short-circuit: existence verification disabled.
   if [ "$TRACKER_KIND" = "none" ]; then
-    # Shape-only validation already happened above (PR title regex). Nothing
+    # Shape-only validation already happened above (body reference regex). Nothing
     # more to do for this branch.
     TICKET_NUM=""
   fi

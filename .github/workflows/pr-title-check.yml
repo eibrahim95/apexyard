@@ -46,7 +46,12 @@ jobs:
             // Title: type(scope): description, scope = lowercase component.
             // Ticket: first closing keyword in the body (Closes #58 / Closes ABC-123).
             // Aligned with .claude/hooks/validate-pr-create.sh (AgDR-0165).
-            const body = context.payload.pull_request.body || '';
+            // Drop HTML comments and code, which GitHub ignores for closing
+            // keywords (and which hold the PR template's example).
+            const body = (context.payload.pull_request.body || '')
+              .replace(/<!--[\s\S]*?(-->|$)/g, '')
+              .replace(/^[ \t]*(```|~~~)[\s\S]*?(^[ \t]*\1|(?![\s\S]))/gm, '')
+              .replace(/`[^`\n]*`/g, '');
 
             if (!/^[a-z]+\([a-z][a-z0-9._-]*\)!?:/.test(title)) {
               core.setFailed(
