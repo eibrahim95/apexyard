@@ -314,11 +314,13 @@ case_3() {
 
 # =============================================================================
 # Case 4: validate-pr-create.sh dispatches the jira CLI (not gh) for a
-# PROJ-shaped PR title, from inside the workspace clone.
+# PROJ-shaped ticket reference, from inside the workspace clone.
 #
-# The PR title `feat(PROJ-42): ...` should:
-#   - Pass the title shape check (PROJ-NN is on the legacy allow-list
-#     via the default tracker.id_pattern's [A-Z]{2,10}-[0-9]+ branch).
+# The PR title `feat(hooks): ...` with body `Closes PROJ-42` should:
+#   - Pass the title shape check (a lowercase component scope).
+#   - Extract PROJ-42 from the body's closing keyword (PROJ-NN is on the
+#     legacy allow-list via the default tracker.id_pattern's
+#     [A-Z]{2,10}-[0-9]+ branch).
 #   - Be routed through `tracker_view PROJ-42` which dispatches to
 #     `jira issue view PROJ-42 --raw` (our mock returns OK).
 #   - Exit 0 (hook accepts the PR).
@@ -336,7 +338,9 @@ case_4() {
   # Build a syntactically-valid PR command. The branch carries a PROJ-ID
   # so the branch-name check on the hook passes too.
   local cmd
-  cmd='gh pr create --title "feat(PROJ-42): add jira-shaped ticket flow" --body "
+  cmd='gh pr create --title "feat(hooks): add jira-shaped ticket flow" --body "
+Closes PROJ-42
+
 ## Testing
 verify against staging
 

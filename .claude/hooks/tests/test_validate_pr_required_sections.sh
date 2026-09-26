@@ -60,7 +60,7 @@ run_case() {
   mock_gh_install "$sb"
   local body_file="$sb/body.md"
   printf '%s' "$body_content" > "$body_file"
-  local cmd="gh pr create --repo me2resh/apexyard --title 'chore(#113): test' --body-file $body_file"
+  local cmd="gh pr create --repo me2resh/apexyard --title 'chore(hooks): test' --body-file $body_file"
   local input
   input=$(jq -nc --arg c "$cmd" '{tool_input:{command:$c}}')
   local got_stderr got_rc
@@ -86,6 +86,8 @@ run_case() {
 run_case "body with Summary + Testing + Glossary → pass" \
   "## Summary
 x
+
+Closes #113
 
 ## Testing
 y
@@ -120,11 +122,14 @@ run_case "body missing both → block also names Glossary" \
 
 run_case "skip marker bypasses with warning" \
   "no sections here
+Closes #113
 <!-- pr-sections: skip -->" \
   0 "pr-sections check bypassed by skip marker"
 
 run_case "headings are case-insensitive" \
-  "## testing
+  "Closes #113
+
+## testing
 y
 
 ## glossary
@@ -161,7 +166,7 @@ run_case_missing_file() {
   local sb; sb=$(make_sandbox)
   mock_gh_install "$sb"
   local missing="$sb/definitely-not-here-1058.md"
-  local cmd="gh pr create --repo me2resh/apexyard --title 'chore(#113): test' --body-file $missing"
+  local cmd="gh pr create --repo me2resh/apexyard --title 'chore(hooks): test' --body-file $missing"
   local input; input=$(jq -nc --arg c "$cmd" '{tool_input:{command:$c}}')
   local got_stderr got_rc
   got_stderr=$(cd "$sb" && echo "$input" | bash .claude/hooks/validate-pr-create.sh 2>&1 >/dev/null)
@@ -192,7 +197,7 @@ run_case_missing_file_path() {
   local label="$1" missing="$2" want_rc="$3" want_stderr_regex="$4" reject_stderr_regex="${5:-}"
   local sb; sb=$(make_sandbox)
   mock_gh_install "$sb"
-  local cmd="gh pr create --repo me2resh/apexyard --title 'chore(#113): test' --body-file $missing"
+  local cmd="gh pr create --repo me2resh/apexyard --title 'chore(hooks): test' --body-file $missing"
   local input; input=$(jq -nc --arg c "$cmd" '{tool_input:{command:$c}}')
   local got_stderr got_rc
   got_stderr=$(cd "$sb" && echo "$input" | bash .claude/hooks/validate-pr-create.sh 2>&1 >/dev/null)
@@ -277,6 +282,8 @@ x
 run_case "#1058 guard: readable complete body still passes" \
   "## Summary
 x
+
+Closes #113
 
 ## Testing
 y

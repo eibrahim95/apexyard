@@ -68,6 +68,8 @@ make_sandbox() {
 BODY_OK="## Summary
 test
 
+Closes #194
+
 ## Testing
 1. unit tests pass
 
@@ -83,7 +85,7 @@ run_case() {
   local body_file="$sb/body.md"
   printf '%s' "$BODY_OK" > "$body_file"
 
-  local cmd="gh pr create --repo me2resh/apexyard --title 'fix(#194): test' --body-file $body_file $cmd_extra_flags"
+  local cmd="gh pr create --repo me2resh/apexyard --title 'fix(hooks): test' --body-file $body_file $cmd_extra_flags"
   local input
   input=$(jq -nc --arg c "$cmd" '{tool_input:{command:$c}}')
   local got_stderr got_rc
@@ -182,7 +184,7 @@ run_cd_case() {
   local body_file="$sb/body.md"
   printf '%s' "$BODY_OK" > "$body_file"
 
-  local cmd="cd $tgt && gh pr create --repo me2resh/apexyard --title 'fix(#693): test' --body-file $body_file"
+  local cmd="cd $tgt && gh pr create --repo me2resh/apexyard --title 'fix(hooks): test' --body-file $body_file"
   local input
   input=$(jq -nc --arg c "$cmd" '{tool_input:{command:$c}}')
   local got_stderr got_rc

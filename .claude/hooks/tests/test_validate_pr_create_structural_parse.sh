@@ -116,6 +116,8 @@ run_case() {
 BODY_WITH_SECTIONS="## Summary
 Change description.
 
+Closes #743
+
 ## Testing
 1. Run the tests.
 
@@ -126,6 +128,8 @@ Change description.
 
 BODY_MISSING_GLOSSARY="## Summary
 Change description.
+
+Closes #743
 
 ## Testing
 1. Run the tests."
@@ -138,11 +142,11 @@ printf '%s' "$BODY_WITH_SECTIONS"    > "$BODY_FILE_FULL"
 printf '%s' "$BODY_MISSING_GLOSSARY" > "$BODY_FILE_PARTIAL"
 
 run_case "Bug1: --body-file with both sections → PASS" \
-  "gh pr create --repo me2resh/apexyard --title 'fix(#743): test' --body-file $BODY_FILE_FULL" \
+  "gh pr create --repo me2resh/apexyard --title 'fix(hooks): test' --body-file $BODY_FILE_FULL" \
   0 ""
 
 run_case "Bug1: --body-file missing ## Glossary → BLOCK" \
-  "gh pr create --repo me2resh/apexyard --title 'fix(#743): test' --body-file $BODY_FILE_PARTIAL" \
+  "gh pr create --repo me2resh/apexyard --title 'fix(hooks): test' --body-file $BODY_FILE_PARTIAL" \
   2 "missing required '## Glossary' section"
 
 rm -f "$BODY_FILE_FULL" "$BODY_FILE_PARTIAL"
@@ -173,7 +177,7 @@ printf '%s' "$BODY_WITH_SECTIONS" > "$BF2"
 #     the sections are found, and the hook passes.
 # (A --repo-only garble degrades gracefully and would pass either way — i.e. it
 # would pass for the wrong reason, which is exactly the gap Rex flagged.)
-MULTI_LINE_CMD=$'gh pr create --repo me2resh/apexyard \\\n  --title \'fix(#743): multiline\' \\\n  --head fix/GH-743-test \\\n  --body-file\\\n'"$BF2"
+MULTI_LINE_CMD=$'gh pr create --repo me2resh/apexyard \\\n  --title \'fix(hooks): multiline\' \\\n  --head fix/GH-743-test \\\n  --body-file\\\n'"$BF2"
 
 run_case "Bug2: backslash-continued multi-line (--body-file on continuation) resolves cleanly → PASS" \
   "$MULTI_LINE_CMD" \
@@ -214,15 +218,15 @@ rm -f "$BF3"
 # '\n' in a shell string does not provide.
 BF_REG_PASS=$(mktemp /tmp/test-743-reg-pass.XXXXXX.md)
 BF_REG_FAIL=$(mktemp /tmp/test-743-reg-fail.XXXXXX.md)
-printf '## Summary\nfoo\n\n## Testing\nbar\n' > "$BF_REG_FAIL"
-printf '## Summary\nfoo\n\n## Testing\nbar\n\n## Glossary\n| t | d |\n' > "$BF_REG_PASS"
+printf '## Summary\nfoo\n\nCloses #743\n\n## Testing\nbar\n' > "$BF_REG_FAIL"
+printf '## Summary\nfoo\n\nCloses #743\n\n## Testing\nbar\n\n## Glossary\n| t | d |\n' > "$BF_REG_PASS"
 
 run_case "Regression: --body-file missing ## Glossary still BLOCKS" \
-  "gh pr create --repo me2resh/apexyard --title 'fix(#743): test' --head fix/#743-test --body-file $BF_REG_FAIL" \
+  "gh pr create --repo me2resh/apexyard --title 'fix(hooks): test' --head fix/#743-test --body-file $BF_REG_FAIL" \
   2 "missing required '## Glossary' section"
 
 run_case "Regression: --body-file with both sections → PASS" \
-  "gh pr create --repo me2resh/apexyard --title 'fix(#743): test' --head fix/#743-test --body-file $BF_REG_PASS" \
+  "gh pr create --repo me2resh/apexyard --title 'fix(hooks): test' --head fix/#743-test --body-file $BF_REG_PASS" \
   0 ""
 
 rm -f "$BF_REG_PASS" "$BF_REG_FAIL"

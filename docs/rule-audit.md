@@ -67,7 +67,7 @@ Columns:
 | Never `git add -A` / `.` / `--all` | `.claude/rules/git-conventions.md § File Staging` | `block-git-add-all.sh` | yes | mechanized |
 | No direct commits / pushes to `main` / `master` | `.claude/rules/git-conventions.md § No Direct Main` | `block-main-push.sh` | yes | mechanized |
 | Branch name format `{type}/{TICKET-ID}-{slug}` | `.claude/rules/git-conventions.md § Branch Naming` | `validate-branch-name.sh` | yes | mechanized (warning-only today, blocker upgrade in [#20][20]) |
-| PR title format `type(TICKET): description` | `.claude/rules/git-conventions.md § PR Title Format` | `validate-pr-create.sh` | yes | mechanized (warning-only today, blocker upgrade in [#20][20]) |
+| PR title format `type(scope): description` | `.claude/rules/git-conventions.md § PR Title Format` | `validate-pr-create.sh` | yes | mechanized (warning-only today, blocker upgrade in [#20][20]) |
 | One ticket ID per PR title (no `fix(#1,2,3):`) | `.claude/rules/git-conventions.md § PR Title Format` | `validate-pr-create.sh` | yes | mechanized |
 | Commit subject matches conventional format (`type: …` / `type(scope): …`) | `.claude/rules/git-conventions.md § Commit Message Format` | `validate-commit-format.sh` | yes | mechanized (AgDR-0001) |
 | Breaking-change marker (`feat!:` / `feat(scope)!:`) | — | — | deferred | [#23][23] — not yet in the accepted commit regex |

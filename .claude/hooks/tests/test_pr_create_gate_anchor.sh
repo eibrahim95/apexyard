@@ -138,6 +138,8 @@ rm -f "$BF"
 BODY_OK="## Summary
 test
 
+Closes #900
+
 ## Testing
 1. unit tests pass
 
@@ -149,15 +151,47 @@ BF_OK=$(mktemp /tmp/test-gate-anchor-ok.XXXXXX.md)
 printf '%s' "$BODY_OK" > "$BF_OK"
 
 run_case 'a genuine gh pr create still validates and PASSES with a conforming title/body/branch' \
-  "gh pr create --repo me2resh/apexyard --title 'fix(#900): gate anchor' --head fix/GH-900-test --body-file $BF_OK" \
+  "gh pr create --repo me2resh/apexyard --title 'fix(hooks): gate anchor' --head fix/GH-900-test --body-file $BF_OK" \
   0 ""
 
 run_case 'a genuine gh pr create with a malformed title still BLOCKS' \
   "gh pr create --repo me2resh/apexyard --title 'no ticket id here' --head fix/GH-900-test --body-file $BF_OK" \
   2 "doesn't match format"
 
+run_case 'a ticket ID in the title scope BLOCKS (the scope names a component, AgDR-0165)' \
+  "gh pr create --repo me2resh/apexyard --title 'fix(#900): gate anchor' --head fix/GH-900-test --body-file $BF_OK" \
+  2 "doesn't match format"
+
+BF_NOREF=$(mktemp /tmp/test-gate-anchor-noref.XXXXXX.md)
+printf '%s' "$BODY_OK" | grep -viE '^(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]]' > "$BF_NOREF"
+BF_PROSE=$(mktemp /tmp/test-gate-anchor-prose.XXXXXX.md)
+printf 'This fixes utf-8 decoding.\n%s' "$BODY_OK" > "$BF_PROSE"
+run_case 'prose like "fixes utf-8" before Closes #N does not hide the ticket' \
+  "gh pr create --repo me2resh/apexyard --title 'fix(hooks): gate anchor' --head fix/GH-900-test --body-file $BF_PROSE" \
+  0 ""
+
+run_case 'a body with no closing reference BLOCKS' \
+  "gh pr create --repo me2resh/apexyard --title 'fix(hooks): gate anchor' --head fix/GH-900-test --body-file $BF_NOREF" \
+  2 "doesn't link a ticket"
+
+run_case 'a closing reference in the title does not count as the body link' \
+  "gh pr create --repo me2resh/apexyard --title 'fix(hooks): Closes #900' --head fix/GH-900-test --body-file $BF_NOREF" \
+  2 "doesn't link a ticket"
+
+BF_HIDDEN=$(mktemp /tmp/test-gate-anchor-hidden.XXXXXX.md)
+{ printf '<!-- Closes #900 -->\n```\nCloses #900\n```\n'; cat "$BF_NOREF"; } > "$BF_HIDDEN"
+run_case 'references inside an HTML comment or fenced code do not count' \
+  "gh pr create --repo me2resh/apexyard --title 'fix(hooks): gate anchor' --head fix/GH-900-test --body-file $BF_HIDDEN" \
+  2 "doesn't link a ticket"
+
+BF_UPPER=$(mktemp /tmp/test-gate-anchor-upper.XXXXXX.md)
+printf 'This fixes UTF-8 decoding.\n%s' "$BODY_OK" > "$BF_UPPER"
+run_case 'a #N reference wins over uppercase prose like "fixes UTF-8"' \
+  "gh pr create --repo me2resh/apexyard --title 'fix(hooks): gate anchor' --head fix/GH-900-test --body-file $BF_UPPER" \
+  0 ""
+
 run_case 'a leading cd prefix before a genuine gh pr create still validates' \
-  "cd /tmp && gh pr create --repo me2resh/apexyard --title 'fix(#900): gate anchor' --head fix/GH-900-test --body-file $BF_OK" \
+  "cd /tmp && gh pr create --repo me2resh/apexyard --title 'fix(hooks): gate anchor' --head fix/GH-900-test --body-file $BF_OK" \
   0 ""
 
 # ---------------------------------------------------------------------------
@@ -171,7 +205,7 @@ run_case 'a leading cd prefix before a genuine gh pr create still validates' \
 # ---------------------------------------------------------------------------
 
 run_case 'a leading env-var assignment before a genuine gh pr create still validates' \
-  "FOO=bar gh pr create --repo me2resh/apexyard --title 'fix(#900): gate anchor' --head fix/GH-900-test --body-file $BF_OK" \
+  "FOO=bar gh pr create --repo me2resh/apexyard --title 'fix(hooks): gate anchor' --head fix/GH-900-test --body-file $BF_OK" \
   0 ""
 
 run_case 'a leading env-var assignment with a malformed title still BLOCKS' \
@@ -179,7 +213,7 @@ run_case 'a leading env-var assignment with a malformed title still BLOCKS' \
   2 "doesn't match format"
 
 run_case 'a leading "time" wrapper before a genuine gh pr create still validates' \
-  "time gh pr create --repo me2resh/apexyard --title 'fix(#900): gate anchor' --head fix/GH-900-test --body-file $BF_OK" \
+  "time gh pr create --repo me2resh/apexyard --title 'fix(hooks): gate anchor' --head fix/GH-900-test --body-file $BF_OK" \
   0 ""
 
 run_case 'a leading "time" wrapper with a malformed title still BLOCKS' \
@@ -187,7 +221,7 @@ run_case 'a leading "time" wrapper with a malformed title still BLOCKS' \
   2 "doesn't match format"
 
 run_case 'a double leading cd (cd a && cd b && …) before a genuine gh pr create still validates' \
-  "cd /tmp && cd /tmp && gh pr create --repo me2resh/apexyard --title 'fix(#900): gate anchor' --head fix/GH-900-test --body-file $BF_OK" \
+  "cd /tmp && cd /tmp && gh pr create --repo me2resh/apexyard --title 'fix(hooks): gate anchor' --head fix/GH-900-test --body-file $BF_OK" \
   0 ""
 
 run_case 'a double leading cd with a malformed title still BLOCKS' \
@@ -195,7 +229,7 @@ run_case 'a double leading cd with a malformed title still BLOCKS' \
   2 "doesn't match format"
 
 run_case 'a generic non-cd prefix (X && gh pr create) still validates' \
-  "echo hi && gh pr create --repo me2resh/apexyard --title 'fix(#900): gate anchor' --head fix/GH-900-test --body-file $BF_OK" \
+  "echo hi && gh pr create --repo me2resh/apexyard --title 'fix(hooks): gate anchor' --head fix/GH-900-test --body-file $BF_OK" \
   0 ""
 
 run_case 'a generic non-cd prefix (X && gh pr create) with a malformed title still BLOCKS' \
@@ -255,7 +289,7 @@ run_case 'same shape with an unquoted malformed title still BLOCKS (proves the g
   2 "doesn't match format"
 
 run_case 'Hakim repro: gh pr create --title fixbug --head br; echo x — a well-formed unquoted title still validates' \
-  "gh pr create --repo me2resh/apexyard --title fix(#900):x --head fix/GH-900-test; echo x" \
+  "gh pr create --repo me2resh/apexyard --title fix(hooks):x --head fix/GH-900-test; echo 'Closes #900'" \
   0 ""
 
 run_case 'same shape (;) with the literal malformed "fixbug" title still BLOCKS' \
@@ -270,7 +304,7 @@ run_case 'same shape (|) with an unquoted malformed title still BLOCKS' \
   "gh pr create --repo me2resh/apexyard --title fixbug --head fix/GH-900-test | cat" \
   2 "doesn't match format"
 
-rm -f "$BF_OK"
+rm -f "$BF_OK" "$BF_NOREF" "$BF_PROSE" "$BF_HIDDEN" "$BF_UPPER"
 
 echo ""
 echo "==================================="

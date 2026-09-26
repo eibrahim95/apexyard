@@ -1,5 +1,6 @@
 <!--
-Title format: type(TICKET): description   — e.g. feat(#42): add session refresh
+Title format: type(scope): description   — e.g. feat(auth): add session refresh
+Link the ticket in the body: Closes #<ticket-number>
 Target the `dev` branch, not `main`. One ticket per PR.
 The sections below are REQUIRED — the validate-pr-create hook + Rex check for them.
 -->

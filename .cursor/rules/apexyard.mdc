@@ -23,7 +23,7 @@ index. Load a named file under `.claude/rules/` only when the work needs it.
 Load-bearing rules before you start:
 
 - One ticket at a time — `/start-ticket <N>` before editing (`.claude/rules/workflow-gates.md`)
-- Branch `{type}/{TICKET-ID}-{description}`, PR title `type(TICKET): description` (`.claude/rules/git-conventions.md`)
+- Branch `{type}/{TICKET-ID}-{description}`, PR title `type(scope): description` with `Closes #N` in the body (`.claude/rules/git-conventions.md`)
 - Ground factual claims in verified evidence (`.claude/rules/evidence-grounding.md`)
 - Match work and ceremony to the change (`.claude/rules/right-size-ceremony.md`)
 - Every PR needs a Glossary plus narrative Summary bullets (`.claude/rules/pr-quality.md`)

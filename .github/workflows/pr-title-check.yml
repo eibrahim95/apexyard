@@ -43,32 +43,37 @@ jobs:
               return;
             }
 
-            // Pattern matches:
-            //   Project tracker: ABC-123, ENG-456, PROJ-789 (2-10 char uppercase prefix + dash + digits)
-            //   GitHub Issues:   #58, #123
-            //
-            // Note: pattern intentionally aligned with the local hooks
-            // (.claude/hooks/validate-branch-name.sh and validate-pr-create.sh)
-            // so anything that passes the hooks also passes this CI check.
-            const trackerPattern = /[A-Z]{2,10}-\d+/;
-            const githubPattern = /#\d+/;
+            // Title: type(scope): description, scope = lowercase component.
+            // Ticket: first closing keyword in the body (Closes #58 / Closes ABC-123).
+            // Aligned with .claude/hooks/validate-pr-create.sh (AgDR-0165).
+            // Drop HTML comments and code, which GitHub ignores for closing
+            // keywords (and which hold the PR template's example).
+            const body = (context.payload.pull_request.body || '')
+              .replace(/<!--[\s\S]*?(-->|$)/g, '')
+              .replace(/^[ \t]*(```|~~~)[\s\S]*?(^[ \t]*\1|(?![\s\S]))/gm, '')
+              .replace(/`[^`\n]*`/g, '');
 
-            const trackerMatch = title.match(trackerPattern);
-            const githubMatch = title.match(githubPattern);
-
-            if (!trackerMatch && !githubMatch) {
+            if (!/^[a-z]+\([a-z][a-z0-9._-]*\)!?:/.test(title)) {
               core.setFailed(
-                `❌ PR title must include a ticket ID\n\n` +
+                `❌ PR title must match type(scope): description\n\n` +
                 `Current title: "${title}"\n\n` +
-                `Valid formats:\n` +
-                `  Tracker: ABC-123, ENG-456\n` +
-                `  GitHub:  #58\n\n` +
-                `Example: "feat(ABC-123): description" or "feat(#58): description"`
+                `Example: "feat(auth): add session refresh"`
               );
               return;
             }
 
-            const ticketId = trackerMatch ? trackerMatch[0] : githubMatch[0];
+            // Keyword is case-insensitive; the ticket shape is not, so prose
+            // like "fixes utf-8" is not mistaken for a ticket.
+            const ref = body.match(/\b(?:[Cc][Ll][Oo][Ss][Ee][SsDd]?|[Ff][Ii][Xx](?:[Ee][SsDd])?|[Rr][Ee][Ss][Oo][Ll][Vv][Ee][SsDd]?)\s+(#\d+|[A-Z]{2,10}-\d+)\b/);
+            if (!ref) {
+              core.setFailed(
+                `❌ PR body must link a ticket with a closing keyword\n\n` +
+                `Example: "Closes #58" or "Closes ABC-123"`
+              );
+              return;
+            }
+
+            const ticketId = ref[1];
             console.log(`✅ Found ticket ID: ${ticketId}`);
             core.setOutput('ticket_id', ticketId);
 
@@ -105,14 +110,13 @@ jobs:
 
             const body = `## ❌ Missing Ticket ID
 
-            Your PR title must include a ticket ID (project tracker or GitHub Issue).
+            Your PR title must use \`type(scope): description\`, and the PR body must link a ticket with a closing keyword.
 
             **Current title**: \`${title}\`
 
-            ### Valid formats
-            - \`feat(ABC-123): add new feature\` (project tracker)
-            - \`fix(#58): correct encryption claim\` (GitHub Issue)
-            - \`ABC-123: Add new feature\`
+            ### Valid format
+            - Title: \`feat(auth): add new feature\`
+            - Body: \`Closes #58\` (GitHub Issue) or \`Closes ABC-123\` (project tracker)
 
             ### Why we require tickets
             - Every change must be tracked
