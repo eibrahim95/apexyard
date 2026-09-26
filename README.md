@@ -179,7 +179,9 @@ same rules through an adapter.
 As of **2026-07-09**, opencode, pi, and Codex have passed real enforcement
 checks. Each tool needs one setting so its commands reach the rules. Cursor
 IDE native exec was observed later (2026-09-16) when third-party configs are
-on. You can always use the
+on. Zed's native agent has no hook surface, so it runs a degraded tier — use
+Claude Agent over ACP there, or read [`docs/harnesses/zed.md`](docs/harnesses/zed.md)
+for exactly what is enforced. You can always use the
 manual configuration files from Quick Start when a skill is unavailable.
 
 | Tool | Enforces your rules? | Setup | Good to know |
@@ -189,6 +191,7 @@ manual configuration files from Quick Start when a skill is unavailable.
 | **pi** | ✅ **Yes — proven.** Same, in a real pi session. | `bash bin/install-pi-adapter.sh` | Run pi with `-a` (auto-approve). pi is deliberately bare-bones — ApexYard is the governance it leaves to you. |
 | **Codex** | ✅ **Yes — proven.** Same, in a real Codex session. | `bash bin/sync-codex-adapter.sh` | Codex has to trust the rules once — `/hooks`, a one-off flag, or a user-level install. Details: [`docs/codex-adapter.md`](docs/codex-adapter.md). |
 | **Cursor** | ✅ **Yes — native in the IDE.** Cursor loads `.claude/` when third-party configs are on. A real Write call was refused by the ticket-first rule (2026-09-16). | Enable third-party configs. Then `bash bin/install-cursor-adapter.sh` for the session-pin overlay. | IDE only. The command-line `cursor-agent` ignores hooks. A leftover full adapter can lock the session. |
+| **Zed** | ⚠️ **Native agent: no blocking gates (degraded tier, 2026-09-26).** Zed v1.21.0 has no lifecycle hooks. The **Claude Agent over ACP** path does enforce fully, because Claude Code reads `.claude/` itself. | Native agent: `bash bin/sync-zed-adapter.sh`, then `bash bin/install-zed-adapter.sh` once per machine. ACP path: install Claude Agent from the ACP registry. | The installer denies `git add -A`/`.`, `gh pr merge` and `gh api .../merge`, and confirms `gh pr create` and `gh issue create`. Every other gate is advisory. Details: [`docs/harnesses/zed.md`](docs/harnesses/zed.md). |
 
 *Under the hood:* your rules stay one set of portable bash scripts, and every tool reads the **same** ones — never a separate copy that can drift out of sync. A daily, credentialed [Conformance CI](docs/conformance-ci.md) job re-verifies opencode, pi, and Codex. Cursor has no headless path in that matrix. Full per-tool setup, limits, and how to add a new tool → **[`docs/harnesses/README.md`](docs/harnesses/README.md)**.
 

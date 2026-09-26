@@ -23,7 +23,17 @@ fail() { echo "  FAIL $1: $2" >&2; FAIL=$((FAIL+1)); FAILED="$FAILED $1"; }
 build_root() {
   local root="$TMPROOT/$1"
   mkdir -p "$root/.claude/skills/update" "$root/.claude/agents"
-  printf '%s\n' '# update fixture' > "$root/.claude/skills/update/SKILL.md"
+  # A minimal VALID skill: the shared export step projects frontmatter, so a
+  # fixture without name/description would fail generation for a reason that
+  # has nothing to do with the /update reconcile recipe under test.
+  cat > "$root/.claude/skills/update/SKILL.md" <<'MD'
+---
+name: update
+description: update fixture.
+---
+
+# update fixture
+MD
   printf '%s\n' '{"hooks":{}}' > "$root/.claude/settings.json"
   printf '%s\n' "$root"
 }
