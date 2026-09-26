@@ -1,11 +1,11 @@
 #!/bin/bash
 # Validates PR creation:
-# - PR title matches format: type(TICKET): description
+# - PR title matches format: type(scope): description
+# - PR body links a ticket with a closing keyword (Closes #N)
 # - PR body contains a Glossary section
 # - Branch has a ticket ID
-# - The ticket referenced in the title actually exists in the tracker repo
-#   (backstop for the ticket-vocabulary rule — catches fabricated #N that
-#   slipped through prose into a PR title)
+# - The ticket linked in the body actually exists in the tracker repo
+#   (backstop for the ticket-vocabulary rule — catches fabricated #N)
 #
 # Customize the ticket pattern below if your team uses a different scheme.
 
@@ -230,7 +230,7 @@ if [ -z "$TITLE" ]; then
 fi
 
 # Validate PR title format if we can extract it
-# Accepts: type(<TICKET>): … or type(<TICKET>)!: … (breaking change)
+# Accepts: type(<scope>): … or type(<scope>)!: … (breaking change)
 # The !? makes the breaking-change marker optional per Conventional Commits 1.0.
 #
 # The accepted type list is project-configurable via .claude/project-config.json
@@ -267,19 +267,94 @@ if [ -z "$PR_TYPES" ]; then
   PR_TYPES="feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|release|spike|sync"
 fi
 
-TICKET_REF=""
-if [ -n "$TITLE" ]; then
-  if ! echo "$TITLE" | grep -qE "^(${PR_TYPES})\(([A-Z]{2,10}-[0-9]+|#[0-9]+)\)!?:"; then
-    ERRORS="${ERRORS}PR title '$TITLE' doesn't match format: type(TICKET-ID): description\n"
-    ERRORS="${ERRORS}Accepted types (from .claude/project-config.*.json → .pr.title_type_whitelist): ${PR_TYPES//|/, }\n"
+BODY_CONTENT=""
+# Extract --body-file path. Handles --body-file and the -F short form.
+# After continuation normalization (above) the command is one logical line.
+# me2resh/apexyard#1058 (residual of #1048): "I could not read the body file"
+# and "the body file has no required sections" are DIFFERENT outcomes, and
+# conflating them is what made this hook report sections as missing from a
+# file it had just warned it could not read — sending the author to edit a
+# body that was never the problem. Set when a --body-file was named but its
+# content could not be recovered; consumed at the section check below.
+BODY_FILE_UNREADABLE=0
+BODY_FILE=$(printf '%s' "$COMMAND" | sed -nE 's/.*--body-file[[:space:]]+([^[:space:]]+).*/\1/p' | head -1)
+if [ -z "$BODY_FILE" ]; then
+  BODY_FILE=$(printf '%s' "$COMMAND" | sed -nE 's/.*[[:space:]]-F[[:space:]]+([^[:space:]]+).*/\1/p' | head -1)
+fi
+# #1038 — strip ONE matched surrounding quote pair.
+#
+# The `[^[:space:]]+` token grab above is quote-blind, so `--body-file
+# "/p/body.md"` yielded the value WITH its quotes: `"/p/body.md"`. The
+# `-f` test below was then false, BODY_CONTENT stayed empty, and the hook
+# blocked the PR reporting `## Testing` / `## Glossary` as missing when both
+# were present in the file — an error message that points at the PR author
+# rather than at the parser. Quoting a path is correct shell practice, so
+# this fired on ordinary usage.
+#
+# Only a MATCHED pair is stripped: a file literally named `"x.md"` (quotes
+# in the filename) must keep resolving to the same path gh will read, not a
+# different one.
+case "$BODY_FILE" in
+  '"'*'"') BODY_FILE=${BODY_FILE#\"}; BODY_FILE=${BODY_FILE%\"} ;;
+  "'"*"'") BODY_FILE=${BODY_FILE#\'}; BODY_FILE=${BODY_FILE%\'} ;;
+esac
+if [ -n "$BODY_FILE" ]; then
+  # Resolve relative paths against the command's cd-target (if any), so
+  # 'cd /project && gh pr create --body-file body.md' finds the file at
+  # /project/body.md rather than testing against the hook's own CWD.
+  # Fixes apexyard#743 Bug 1 for the relative-path variant.
+  if [[ "$BODY_FILE" != /* ]] && [ -n "$CD_TARGET" ]; then
+    BODY_FILE="${CD_TARGET}/${BODY_FILE}"
+  fi
+  if [ -f "$BODY_FILE" ]; then
+    BODY_CONTENT=$(cat "$BODY_FILE")
+    # Readable-but-unslurpable (permissions, race): treat as unreadable rather
+    # than as an empty body, mirroring block-private-refs-in-public-repos.sh.
+    if [ -z "$BODY_CONTENT" ] && [ -s "$BODY_FILE" ]; then
+      BODY_FILE_UNREADABLE=1
+    fi
   else
-    # Extract the ticket reference so we can verify it exists
-    TICKET_REF=$(echo "$TITLE" | sed -nE 's/^[a-z]+\(([^)]+)\):.*/\1/p')
+    echo "WARN: validate-pr-create.sh: --body-file '${BODY_FILE}' not readable from hook context; section check may miss content." >&2
+    BODY_FILE_UNREADABLE=1
   fi
 fi
 
-# Verify the ticket in the title actually exists in the tracker
-# (backstop for ticket-vocabulary.md — catches fabricated #N in PR titles).
+TICKET_REF=""
+if [ -n "$TITLE" ]; then
+  # The scope names a component (lowercase), not a ticket. AgDR-0165.
+  if ! echo "$TITLE" | grep -qE "^(${PR_TYPES})\([a-z][a-z0-9._-]*\)!?:"; then
+    ERRORS="${ERRORS}PR title '$TITLE' doesn't match format: type(scope): description\n"
+    ERRORS="${ERRORS}The scope is a lowercase component name, e.g. feat(auth): ... Put the ticket in the body as 'Closes #N'.\n"
+    ERRORS="${ERRORS}Accepted types (from .claude/project-config.*.json → .pr.title_type_whitelist): ${PR_TYPES//|/, }\n"
+  fi
+  # The ticket lives in the body: a closing keyword + #N or PREFIX-N.
+  # Scans the body file and the raw command (inline --body) minus the title,
+  # after removing HTML comments and fenced code, which GitHub ignores.
+  # A #N match wins over PREFIX-N so prose such as "fixes UTF-8" can't
+  # shadow the real reference.
+  _refs=$(printf '%s\n%s\n' "$BODY_CONTENT" "${COMMAND/"$TITLE"/}" | awk '
+    /^[[:space:]]*(```|~~~)/ && !c { f = !f; next }
+    f { next }
+    {
+      line = $0; out = ""
+      while (1) {
+        if (c) { i = index(line, "-->"); if (!i) { line = ""; break }; line = substr(line, i + 3); c = 0 }
+        i = index(line, "<!--"); if (!i) break
+        out = out substr(line, 1, i - 1); line = substr(line, i + 4); c = 1
+      }
+      print out line
+    }' | \
+    grep -oE '\b([Cc][Ll][Oo][Ss][Ee][SsDd]?|[Ff][Ii][Xx]([Ee][SsDd])?|[Rr][Ee][Ss][Oo][Ll][Vv][Ee][SsDd]?)[[:space:]]+(#[0-9]+|[A-Z]{2,10}-[0-9]+)\b' | \
+    grep -oE '(#[0-9]+|[A-Z]{2,10}-[0-9]+)$')
+  TICKET_REF=$(printf '%s\n' "$_refs" | grep -m1 '^#')
+  [ -z "$TICKET_REF" ] && TICKET_REF=$(printf '%s\n' "$_refs" | head -1)
+  if [ -z "$TICKET_REF" ]; then
+    ERRORS="${ERRORS}PR body doesn't link a ticket. Add a closing keyword such as 'Closes #N' (cross-repo 'owner/repo#N' is not accepted).\n"
+  fi
+fi
+
+# Verify the ticket linked in the body actually exists in the tracker
+# (backstop for ticket-vocabulary.md — catches fabricated #N in PR bodies).
 #
 # Tracker-aware: uses `_lib-tracker.sh` for the existence check. Default
 # config (tracker.kind = gh) preserves today's behaviour exactly: dispatches
@@ -326,7 +401,7 @@ if [ -n "$TICKET_REF" ]; then
 
   # Short-circuit: existence verification disabled.
   if [ "$TRACKER_KIND" = "none" ]; then
-    # Shape-only validation already happened above (PR title regex). Nothing
+    # Shape-only validation already happened above (body reference regex). Nothing
     # more to do for this branch.
     TICKET_NUM=""
   fi
@@ -432,7 +507,7 @@ if [ -n "$TICKET_REF" ]; then
         NOT_FOUND_LOC="${TRACKER_REPO}"
       fi
       cat >&2 <<MSG
-BLOCKED: PR title references ${TICKET_REF} but issue #${TICKET_NUM} does not
+BLOCKED: PR body references ${TICKET_REF} but issue #${TICKET_NUM} does not
 exist in ${NOT_FOUND_LOC}.
 
 This is the failure mode the ticket-vocabulary rule exists to prevent — do NOT
@@ -442,7 +517,7 @@ See .claude/rules/ticket-vocabulary.md § "The rule".
 If you intended to create the PR for a real ticket, verify the number.
 If you were about to file work that has no ticket yet, create one first:
   gh issue create --repo ${TRACKER_REPO} --title "..."
-and use the returned number in your PR title.
+and use the returned number in your PR body (Closes #N).
 MSG
       exit 2
     fi
@@ -460,7 +535,7 @@ MSG
     esac
     if [ "$IS_CLOSED" = "1" ]; then
       cat >&2 <<MSG
-BLOCKED: PR title references ${TICKET_REF} but issue #${TICKET_NUM} in
+BLOCKED: PR body references ${TICKET_REF} but issue #${TICKET_NUM} in
 ${MATCHED_REPO} is CLOSED.
 
 Every PR needs its own OPEN ticket. Referencing a closed issue means the PR
@@ -470,11 +545,11 @@ through the SDLC states — the ticket is already Done.
 Common causes:
   - The work is a follow-up to the closed issue → create a NEW ticket that
     describes the follow-up, link back to the closed one in the body, and
-    use the new number in the PR title.
+    use the new number in the PR body.
   - The closed issue was auto-closed by a prior PR that didn't fully finish
     the work → re-open it (gh issue reopen ${TICKET_NUM} --repo ${MATCHED_REPO})
     or create a new ticket for the remaining work.
-  - The number is a typo → fix the PR title.
+  - The number is a typo → fix the PR body.
 
 See .claude/rules/ticket-vocabulary.md and the "every PR needs its own open
 ticket" feedback in memory.
@@ -496,58 +571,6 @@ fi
 # Skip marker: the literal `.pr.skip_marker` string in the body bypasses
 # the check with a visible stderr WARN. Default marker is
 # `<!-- pr-sections: skip -->`.
-BODY_CONTENT=""
-# Extract --body-file path. Handles --body-file and the -F short form.
-# After continuation normalization (above) the command is one logical line.
-# me2resh/apexyard#1058 (residual of #1048): "I could not read the body file"
-# and "the body file has no required sections" are DIFFERENT outcomes, and
-# conflating them is what made this hook report sections as missing from a
-# file it had just warned it could not read — sending the author to edit a
-# body that was never the problem. Set when a --body-file was named but its
-# content could not be recovered; consumed at the section check below.
-BODY_FILE_UNREADABLE=0
-BODY_FILE=$(printf '%s' "$COMMAND" | sed -nE 's/.*--body-file[[:space:]]+([^[:space:]]+).*/\1/p' | head -1)
-if [ -z "$BODY_FILE" ]; then
-  BODY_FILE=$(printf '%s' "$COMMAND" | sed -nE 's/.*[[:space:]]-F[[:space:]]+([^[:space:]]+).*/\1/p' | head -1)
-fi
-# #1038 — strip ONE matched surrounding quote pair.
-#
-# The `[^[:space:]]+` token grab above is quote-blind, so `--body-file
-# "/p/body.md"` yielded the value WITH its quotes: `"/p/body.md"`. The
-# `-f` test below was then false, BODY_CONTENT stayed empty, and the hook
-# blocked the PR reporting `## Testing` / `## Glossary` as missing when both
-# were present in the file — an error message that points at the PR author
-# rather than at the parser. Quoting a path is correct shell practice, so
-# this fired on ordinary usage.
-#
-# Only a MATCHED pair is stripped: a file literally named `"x.md"` (quotes
-# in the filename) must keep resolving to the same path gh will read, not a
-# different one.
-case "$BODY_FILE" in
-  '"'*'"') BODY_FILE=${BODY_FILE#\"}; BODY_FILE=${BODY_FILE%\"} ;;
-  "'"*"'") BODY_FILE=${BODY_FILE#\'}; BODY_FILE=${BODY_FILE%\'} ;;
-esac
-if [ -n "$BODY_FILE" ]; then
-  # Resolve relative paths against the command's cd-target (if any), so
-  # 'cd /project && gh pr create --body-file body.md' finds the file at
-  # /project/body.md rather than testing against the hook's own CWD.
-  # Fixes apexyard#743 Bug 1 for the relative-path variant.
-  if [[ "$BODY_FILE" != /* ]] && [ -n "$CD_TARGET" ]; then
-    BODY_FILE="${CD_TARGET}/${BODY_FILE}"
-  fi
-  if [ -f "$BODY_FILE" ]; then
-    BODY_CONTENT=$(cat "$BODY_FILE")
-    # Readable-but-unslurpable (permissions, race): treat as unreadable rather
-    # than as an empty body, mirroring block-private-refs-in-public-repos.sh.
-    if [ -z "$BODY_CONTENT" ] && [ -s "$BODY_FILE" ]; then
-      BODY_FILE_UNREADABLE=1
-    fi
-  else
-    echo "WARN: validate-pr-create.sh: --body-file '${BODY_FILE}' not readable from hook context; section check may miss content." >&2
-    BODY_FILE_UNREADABLE=1
-  fi
-fi
-
 if echo "$COMMAND" | grep -qE '\-\-body(-file)?\b'; then
   # Combined haystack — scan both the file content (if --body-file) and the
   # raw command (so inline --body "..." also matches).
@@ -746,8 +769,8 @@ if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BR
   # ticket-id because the release itself is the ticket. The /release-sync
   # branch `sync/main-to-dev-after-vN.N.N` is exempt for the same reason
   # (the release being synced is the ticket) — see apexyard#458 and the
-  # /release-sync skill. The PR title still references a live ticket via
-  # `sync(#N):`, which the title check above validates.
+  # /release-sync skill. The PR body still links a live ticket, which the
+  # ticket check above validates.
   if echo "$CURRENT_BRANCH" | grep -qE '^release/v[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?$|^sync/main-to-dev-after-v[0-9]+\.[0-9]+\.[0-9]+$'; then
     :  # release-cut or release-sync branch, exempt — fall through to the rest of the validator
   elif ! echo "$CURRENT_BRANCH" | grep -qE '[A-Z]{2,10}-[0-9]+|GH-[0-9]+|#[0-9]+'; then

@@ -1,8 +1,9 @@
 #!/bin/bash
 # Tests for the single-Closes-keyword check in validate-pr-create.sh (#114).
 #
-# Note: the PR title in each case (`chore(#114): test`) references issue #114 in
-# me2resh/apexyard. Rather than depend on that issue staying OPEN forever, the
+# Note: the PR body in each case references issue #114 in me2resh/apexyard via
+# a closing keyword (the ticket now lives in the body, not the title —
+# AgDR-0165). Rather than depend on that issue staying OPEN forever, the
 # sandbox installs a fake `gh` on PATH (see _lib-mock-gh.sh) that returns a
 # synthetic OPEN response for any `gh issue view`. Removes the live-tracker
 # dependency from the suite. See me2resh/apexyard#154.
@@ -52,7 +53,7 @@ run_case() {
   if [ -n "$extra_config" ]; then
     echo "$extra_config" > "$sb/.claude/project-config.json"
   fi
-  local cmd="gh pr create --repo me2resh/apexyard --title 'chore(#114): test' --body-file $body_file"
+  local cmd="gh pr create --repo me2resh/apexyard --title 'chore(hooks): test' --body-file $body_file"
   local input
   input=$(jq -nc --arg c "$cmd" '{tool_input:{command:$c}}')
   local got_stderr got_rc
@@ -82,10 +83,10 @@ does a thing
 Closes #114" \
   0 ""
 
-run_case "no closing keyword → pass (cross-ref is ok)" \
+run_case "no closing keyword → blocks (body doesn't link a ticket)" \
   "## Summary
 relates to #99" \
-  0 ""
+  2 "doesn't link a ticket"
 
 run_case "two distinct Closes → block" \
   "## Summary

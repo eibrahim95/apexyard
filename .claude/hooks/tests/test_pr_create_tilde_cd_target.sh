@@ -59,6 +59,8 @@ FAILED_CASES=""
 BODY_OK="## Summary
 test
 
+Closes #900
+
 ## Testing
 1. unit tests pass
 
@@ -131,7 +133,7 @@ run_tilde_case() {
   # expanded by THIS test script's own shell — it must reach the hook
   # exactly as a real (un-executed) user command would contain it: a raw,
   # un-expanded tilde in the cd-target path.
-  local cmd="cd ~/Projects/tilde-target && gh pr create --repo me2resh/apexyard --title 'fix(#900): test' --body-file $body_file"
+  local cmd="cd ~/Projects/tilde-target && gh pr create --repo me2resh/apexyard --title 'fix(hooks): test' --body-file $body_file"
   local input
   input=$(jq -nc --arg c "$cmd" '{tool_input:{command:$c}}')
 

@@ -58,13 +58,13 @@ cp ~/apexyard/golden-paths/pipelines/ci.yml .github/workflows/
 
 **Fail conditions**:
 
-- No ticket ID found in PR title
+- Title doesn't match `type(scope): description`
+- No closing reference (`Closes #58`) in the PR body
 
-**Valid title formats**:
+**Valid format**:
 
-- `feat(ABC-123): add new feature`
-- `fix(#58): correct encryption claim`
-- `ABC-123: Add new feature`
+- Title: `fix(crypto): correct encryption claim`
+- Body: `Closes #58` or `Closes ABC-123`
 
 ---
 

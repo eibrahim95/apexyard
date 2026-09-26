@@ -211,9 +211,9 @@ run_prc() {
   body_file="$sb/body.md"
   printf '%s' "$body_content" > "$body_file"
   case "$quoting" in
-    double) cmd="gh pr create --repo me2resh/apexyard --title 'chore(#113): test' --body-file \"$body_file\"" ;;
-    single) cmd="gh pr create --repo me2resh/apexyard --title 'chore(#113): test' --body-file '$body_file'" ;;
-    *)      cmd="gh pr create --repo me2resh/apexyard --title 'chore(#113): test' --body-file $body_file" ;;
+    double) cmd="gh pr create --repo me2resh/apexyard --title 'chore(hooks): test' --body-file \"$body_file\"" ;;
+    single) cmd="gh pr create --repo me2resh/apexyard --title 'chore(hooks): test' --body-file '$body_file'" ;;
+    *)      cmd="gh pr create --repo me2resh/apexyard --title 'chore(hooks): test' --body-file $body_file" ;;
   esac
   # EXPORT the mock onto PATH for the whole subshell. `PATH=... jq ...` would
   # scope it to jq alone, leaving the hook to find the real gh — which then
@@ -230,6 +230,8 @@ run_prc() {
 FULL_BODY='## Summary
 
 - Does a thing, and here is why it matters.
+
+Closes #113
 
 ## Testing
 

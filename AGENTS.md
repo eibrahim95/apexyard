@@ -47,7 +47,7 @@ Four hard gates — full detail in `.claude/rules/workflow-gates.md`:
 Read the named file in the table below when the work matches. Do not restate
 the full rule body here.
 
-- Branch `{type}/{TICKET-ID}-{description}`. PR title `type(TICKET): description`.
+- Branch `{type}/{TICKET-ID}-{description}`. PR title `type(scope): description`; link the ticket in the body (`Closes #N`).
 - Never `git add -A`. Never push directly to `main`.
 - One ticket at a time. Each PR is one ticket.
 - Every merge needs an explicit per-PR human nod.
@@ -169,7 +169,7 @@ The rest of this file is for an agent extending **apexyard itself** — its hook
 ### Conventions
 
 - **Branch naming**: `{type}/{TICKET-ID}-{description}` (e.g. `feature/GH-42-csv-export`, `fix/#58-login-bug`)
-- **PR title**: `type(TICKET): description` (e.g. `feat(#42): add CSV export`). Enforced by `validate-pr-create.sh`.
+- **PR title**: `type(scope): description` (e.g. `feat(export): add CSV export`), with `Closes #N` in the body. Enforced by `validate-pr-create.sh`.
 - **Commit message**: `type: subject` body with `Closes #N` / `Refs #N`. Enforced by `validate-commit-message.sh`.
 - **AgDR convention**: body-H1 only, no YAML frontmatter (the live convention has drifted from `templates/agdr.md`; AgDR files use plain `# Title` at the top).
 - **Glossary section required in every PR body** — enforced by Rex during code review.

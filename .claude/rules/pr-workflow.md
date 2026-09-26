@@ -31,7 +31,7 @@ Also check before pushing:
 
 ```
 [ ] Only intended files staged?  NO → use specific `git add <file>` (NEVER `git add -A`)
-[ ] PR title matches format?     NO → type(TICKET-ID): description
+[ ] PR title matches format?     NO → type(scope): description
 ```
 
 ## Before `gh pr create`
@@ -40,7 +40,7 @@ Also check before pushing:
 [ ] Ticket exists?            NO → create the ticket FIRST
 [ ] Ticket has AC?            NO → add acceptance criteria
 [ ] Branch has ticket ID?     NO → rename branch
-[ ] PR title has ticket ID?   NO → fix format (single ticket per title)
+[ ] PR body links ticket?     NO → add `Closes #N`
 ```
 
 ## After `gh pr create`
