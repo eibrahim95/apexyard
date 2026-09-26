@@ -123,6 +123,7 @@ These one-liners stay here because agents use them on almost every turn. The ful
 
 - Branch `{type}/{TICKET-ID}-{description}`. PR title `type(scope): description`; link the ticket in the body (`Closes #N`).
 - Never `git add -A` or `git add .`. Never push directly to `main`.
+- No AI attribution lines (`Co-Authored-By: Claude`, `Claude-Session:`, `Generated with Claude Code`) in commits or PR descriptions.
 - Tests, lint, typecheck, and build must pass before push. Coverage for domain logic stays above 80%.
 - Every merge needs Rex plus an explicit per-PR human nod. A plan-level "go" does not authorize merge.
 - No hardcoded secrets. Use environment variables.
