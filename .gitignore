@@ -14,16 +14,18 @@
 # each machine; kept untracked per AgDR-0088. Regenerate, never edit.
 .agents/
 
-# Split-portfolio v2: the live registry, project docs, and onboarding config
-# live in the private sibling portfolio repository.
+# Split-portfolio v2: the live registry and project docs live in the private
+# sibling portfolio repository. projects/README.md is tracked framework content,
+# so it stays visible (same pattern as workspace/ below).
 /apexyard.projects.yaml
-/projects/
-onboarding.yaml
+/projects/*
+!/projects/README.md
 
 # Real onboarding config (#517). The tracked template is onboarding.example.yaml;
 # /setup copies it to onboarding.yaml (this file) and fills in real values that
 # must stay LOCAL — company name, internal URLs, tracker instance, named people.
 # block-onboarding-in-git.sh backstops this gitignore at commit time.
+onboarding.yaml
 
 # ApexYard per-project config written by /onboard. Contains deploy URLs and
 # sensitive-topic notes that should not leak to git — keep it local.
