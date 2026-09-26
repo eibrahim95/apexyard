@@ -1,0 +1,237 @@
+{
+  "schema": 1,
+  "harness": "zed",
+  "adapter": "apexyard-zed",
+  "generated_from": ".claude",
+  "tier": "degraded",
+  "last_verified": {
+    "date": "2026-09-26",
+    "zed_version": "1.21.0"
+  },
+  "status_legend": {
+    "supported": "A fetched source states the capability exists at the recorded Zed version.",
+    "absent": "A fetched source shows the capability does not exist at the recorded Zed version.",
+    "unverified": "No fetched source states the capability. Never treat this as \"no change\"."
+  },
+  "sources": [
+    {
+      "id": "zed-docs-skills",
+      "url": "https://zed.dev/docs/ai/skills"
+    },
+    {
+      "id": "zed-docs-tool-permissions",
+      "url": "https://zed.dev/docs/ai/tool-permissions"
+    },
+    {
+      "id": "zed-docs-tools",
+      "url": "https://zed.dev/docs/ai/tools"
+    },
+    {
+      "id": "zed-docs-external-agents",
+      "url": "https://zed.dev/docs/ai/external-agents"
+    },
+    {
+      "id": "zed-docs-hooks",
+      "url": "https://zed.dev/docs/ai/hooks"
+    },
+    {
+      "id": "zed-releases-api",
+      "url": "https://api.github.com/repos/zed-industries/zed/releases/latest"
+    },
+    {
+      "id": "zed-hooks-proposal",
+      "url": "https://api.github.com/repos/zed-industries/zed/issues/57890"
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "skills.project_discovery",
+      "status": "supported",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/skills",
+      "evidence": "Zed loads project-local skills from <worktree>/.agents/skills/. Each skill is a direct child of the skills root; nesting is not supported.",
+      "adapter_use": "bin/sync-zed-adapter.sh generates .agents/skills.",
+      "on_change": "If the discovery path or the flat-layout rule changes, update the generator and re-run it."
+    },
+    {
+      "id": "skills.frontmatter_fields",
+      "status": "supported",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/skills",
+      "evidence": "The documented fields are name (required), description (required), and disable-model-invocation (optional). The page says other Agent Skills fields are planned.",
+      "adapter_use": "The shared export projects every SKILL.md to exactly these three fields.",
+      "on_change": "When Zed honors more fields, widen the projection in bin/_lib-adapter-skills.sh so the dropped fields come back."
+    },
+    {
+      "id": "skills.name_validation",
+      "status": "supported",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/skills",
+      "evidence": "A name must use lowercase letters, numbers and hyphens, must not start or end with a hyphen, must not contain consecutive hyphens, and must be 1-64 characters. Invalid names fail to load.",
+      "adapter_use": "adapter_skill_name_valid() fails generation on a violating folder, and the exporter asserts name matches the folder name."
+    },
+    {
+      "id": "skills.disable_model_invocation",
+      "status": "supported",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/skills",
+      "evidence": "disable-model-invocation: true hides a skill from the agent's catalog while keeping the slash command.",
+      "adapter_use": "The three approve-* skills keep this field in the generated tree."
+    },
+    {
+      "id": "skills.slash_command_and_mention",
+      "status": "supported",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/skills",
+      "evidence": "A skill can be loaded with a /slash command or an @skill mention, and the agent may invoke it from its catalog.",
+      "adapter_use": "This is how the operator invokes ApexYard skills under Zed."
+    },
+    {
+      "id": "skills.catalog_budget",
+      "status": "supported",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/skills",
+      "evidence": "The total size of all skill names and descriptions is capped at 50KB; skills that do not fit are dropped with a warning.",
+      "adapter_use": "The adapter ships all skills; a growth past the cap would silently drop skills from the catalog."
+    },
+    {
+      "id": "skills.project_trust_gate",
+      "status": "supported",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/skills",
+      "evidence": "Project-local skills load only from trusted worktrees.",
+      "adapter_use": "A fresh clone shows no skills until the worktree is trusted."
+    },
+    {
+      "id": "tools.skill_permission_path_matching",
+      "status": "supported",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/tool-permissions",
+      "evidence": "The skill tool matches patterns against the absolute path to the skill's SKILL.md file, and a user-invoked /skill-name does not prompt again.",
+      "adapter_use": "Documents how to allow or deny individual ApexYard skills."
+    },
+    {
+      "id": "tool_permissions.keys",
+      "status": "supported",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/tool-permissions",
+      "evidence": "agent.tool_permissions.default, plus tools.<tool>.{default, always_allow, always_deny, always_confirm} with {pattern, case_sensitive} entries.",
+      "adapter_use": "bin/install-zed-adapter.sh writes always_deny and always_confirm rules under tools.terminal.",
+      "on_change": "A renamed key silently stops enforcing; re-verify this entry against the live page before changing the installer."
+    },
+    {
+      "id": "tool_permissions.precedence",
+      "status": "supported",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/tool-permissions",
+      "evidence": "Precedence: built-in security rules, then always_deny, then always_confirm, then always_allow, then the tool default, then the global default.",
+      "adapter_use": "The adapter relies on always_deny outranking a global default of allow.",
+      "on_change": "A weaker deny layer would make the installer rules advisory instead of blocking."
+    },
+    {
+      "id": "tool_permissions.chained_commands",
+      "status": "supported",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/tool-permissions",
+      "evidence": "For the terminal tool, Zed parses chained commands and checks each sub-command against the patterns.",
+      "adapter_use": "A deny rule still matches `cd x && git add -A`."
+    },
+    {
+      "id": "tool_permissions.scope_user_default",
+      "status": "supported",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/tool-permissions",
+      "evidence": "The documented setup paths are the Settings Editor and the user settings file; the installer therefore writes the per-machine user settings file.",
+      "adapter_use": "Every developer runs bin/install-zed-adapter.sh once per machine."
+    },
+    {
+      "id": "tool_permissions.scope_project",
+      "status": "unverified",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/tool-permissions",
+      "evidence": "No fetched source states whether agent.tool_permissions can be set per project. The ticket assumes user-level only; the adapter does not depend on the answer.",
+      "adapter_use": "None. The installer writes user settings.",
+      "on_change": "If a project scope ships, the adapter could generate project rules and drop the per-machine install step."
+    },
+    {
+      "id": "agents.spawn_subagent",
+      "status": "supported",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/tools",
+      "evidence": "spawn_agent spawns a subagent with its own context window; each subagent has access to the same tools as the parent agent.",
+      "adapter_use": "Review skills are told to spawn the reviewer with spawn_agent and a prompt that adopts the reviewer agent-definition file.",
+      "on_change": "If Zed ships typed subagents with restricted tools, the reviewer read-only gap closes."
+    },
+    {
+      "id": "agents.subagent_tool_restriction",
+      "status": "absent",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/tools",
+      "evidence": "The tools page states a subagent gets the parent's tools. No read-only subagent tier is documented.",
+      "adapter_use": "The reviewer read-only rule stays advisory; the spawn prompt must instruct the subagent not to modify the repository."
+    },
+    {
+      "id": "agents.agent_definition_files",
+      "status": "absent",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/skills",
+      "evidence": "No fetched page documents project files that define agent personas or per-agent model/tool configuration for the native agent.",
+      "adapter_use": "The adapter generates no agent files; reviewer personas travel in the spawn prompt."
+    },
+    {
+      "id": "agents.lifecycle_hooks",
+      "status": "absent",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/hooks",
+      "evidence": "The hooks documentation page returns 404, and no fetched page documents an agent.hooks setting. The proposal zed-industries/zed#57890 (closed 2026-05-28, state_reason completed) covered commands, lifecycle hooks and skills together; only skills are documented today.",
+      "adapter_use": "None. Every blocking gate except the tool-permission rules is advisory under the native agent.",
+      "on_change": "Add a hooks transport that delegates to the unmodified .claude/hooks/*.sh scripts, and re-tier the adapter."
+    },
+    {
+      "id": "agents.external_agent_acp",
+      "status": "supported",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/external-agents",
+      "evidence": "External agents integrate over ACP; Claude Agent is installed from the ACP registry and may read CLAUDE.md directly.",
+      "adapter_use": "Documents the second Zed path: run Claude Code over ACP and keep the full .claude/ enforcement layer."
+    },
+    {
+      "id": "agents.external_agent_zed_skills",
+      "status": "supported",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/external-agents",
+      "evidence": "Zed Skills do not apply as Zed Skills in External Agent threads; the agent's native skills and instructions depend on the agent.",
+      "adapter_use": "Under the ACP path the .agents/skills export is not used; Claude Agent reads .claude/ itself.",
+      "on_change": "None expected."
+    },
+    {
+      "id": "agents.sandboxing",
+      "status": "unverified",
+      "zed_version": "1.21.0",
+      "verified_on": "2026-09-26",
+      "source": "https://zed.dev/docs/ai/tools",
+      "evidence": "The tools page references a separate Agent Sandboxing page for OS-level restrictions on the terminal tool. That page was not fetched for this verification.",
+      "adapter_use": "None. The adapter does not depend on sandboxing.",
+      "on_change": "Read the Agent Sandboxing page before relying on sandboxing as a gate."
+    }
+  ]
+}

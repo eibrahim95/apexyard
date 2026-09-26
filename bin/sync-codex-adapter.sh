@@ -4,10 +4,16 @@
 # .claude remains the source of truth. This script emits Codex-facing skills,
 # agents, and hook wiring while delegating every gate to the unmodified
 # .claude/hooks/*.sh scripts.
+#
+# The `.agents/skills` tree comes from the shared export step in
+# `bin/_lib-adapter-skills.sh` — the same step `bin/sync-zed-adapter.sh`
+# calls — so the two generators write identical bytes into the shared root and
+# neither detects the other as drift (docs/agdr/AgDR-0166-*).
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CHECK=0
 CLEAN=0
 RECONCILE_INSTALLED=0
@@ -25,7 +31,7 @@ Generate Codex adapter files from .claude:
 
 Options:
   --check       Do not write files; fail if generated output would differ.
-  --clean       Remove generated .agents/.codex before writing.
+  --clean       Remove the adapter-owned generated paths before writing.
   --reconcile-installed
                 Refresh and verify an existing ApexYard Codex adapter. Silently
                 do nothing when no manifest or complete legacy adapter exists.
@@ -74,12 +80,18 @@ CLAUDE_DIR="$ROOT/.claude"
 [ -d "$CLAUDE_DIR" ] || { echo "ERROR: .claude not found under $ROOT" >&2; exit 1; }
 [ -f "$CLAUDE_DIR/settings.json" ] || { echo "ERROR: .claude/settings.json not found" >&2; exit 1; }
 
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/_lib-adapter-skills.sh"
+
 # Adapter-owned generated subpaths, relative to $ROOT. Every drift/reconcile
 # comparison in this script (symlink guard, --check, --check-installed,
 # --reconcile-installed) walks only these paths — anything else living under
 # .agents/ or .codex/ (a hand-authored Codex config.toml, a runtime cache, a
-# user-owned file) is left alone and never flagged as drift or mutated. This
-# mirrors exactly what the generator writes and removes further below.
+# user-owned file) is left alone and never flagged as drift or mutated.
+#
+# `.agents/skills` is jointly owned with the Zed adapter: both generators
+# produce it through the shared export step, so the byte-for-byte result is
+# the same whichever runs last.
 ADAPTER_OWNED_PATHS=(
   ".agents/skills"
   ".codex/agents"
@@ -140,12 +152,6 @@ OUT_AGENTS="$TMPDIR/.agents"
 OUT_CODEX="$TMPDIR/.codex"
 mkdir -p "$OUT_AGENTS" "$OUT_CODEX/agents"
 
-rewrite_skill_paths() {
-  perl -0pi -e '
-    s/\.claude\/skills/.agents\/skills/g;
-  ' "$@"
-}
-
 # Map a Claude model-tier label to a harness-native model via the shared
 # .claude/harness-models.json matrix — the single source of truth every harness
 # adapter reads (pi/opencode add their own column instead of a second mapping).
@@ -154,13 +160,6 @@ rewrite_skill_paths() {
 map_codex_model() {
   jq -r --arg l "$1" '.[$l].codex // $l' "$CLAUDE_DIR/harness-models.json" 2>/dev/null \
     || printf '%s\n' "$1"
-}
-
-copy_tree() {
-  local src="$1" dst="$2"
-  [ -d "$src" ] || return 0
-  mkdir -p "$(dirname "$dst")"
-  cp -R "$src" "$dst"
 }
 
 generate_hooks_json() {
@@ -191,7 +190,7 @@ generate_hooks_json() {
   ' "$CLAUDE_DIR/settings.json"
 }
 
-copy_tree "$CLAUDE_DIR/skills" "$OUT_AGENTS/skills"
+adapter_skills_export "$CLAUDE_DIR/skills" "$OUT_AGENTS/skills"
 generate_hooks_json > "$OUT_CODEX/hooks.json"
 jq -n '{
   adapter: "apexyard-codex",
@@ -222,10 +221,6 @@ assert_hook_counts_match() {
   fi
 }
 assert_hook_counts_match
-
-while IFS= read -r -d '' generated_file; do
-  rewrite_skill_paths "$generated_file"
-done < <(find "$OUT_AGENTS" -type f -print0)
 
 generate_agent_toml() {
   local src="$1"
@@ -312,16 +307,38 @@ if [ "$RECONCILE_INSTALLED" = "1" ] \
   exit 0
 fi
 
+# Codex-owned output replaced on every write. The legacy entries at the end
+# were written by older adapter versions. `.agents/skills` is NOT in this list:
+# it is shared with the Zed adapter's identical export and reconciled by
+# adapter_skills_sync, which refreshes each skill and drops stale ones without
+# removing the shared `.agents` root.
+CODEX_RESET_PATHS=(
+  ".codex/agents"
+  ".codex/hooks"
+  ".codex/rules"
+  ".codex/migrations"
+  ".codex/registries"
+  ".codex/hooks.json"
+  ".codex/project-config.defaults.json"
+  ".codex/framework-version"
+  ".codex/apexyard-adapter.json"
+)
+
+reset_codex_output() {
+  local rel
+  for rel in "${CODEX_RESET_PATHS[@]}"; do
+    rm -rf "$TARGET_ROOT/$rel"
+  done
+}
+
 if [ "$CLEAN" = "1" ]; then
-  rm -rf "$TARGET_ROOT/.agents" "$TARGET_ROOT/.codex"
+  rm -rf "$TARGET_ROOT/.agents/skills"
+  reset_codex_output
 fi
 
 mkdir -p "$TARGET_ROOT/.agents" "$TARGET_ROOT/.codex"
-rm -rf "$TARGET_ROOT/.agents/skills" "$TARGET_ROOT/.codex/agents" "$TARGET_ROOT/.codex/hooks" "$TARGET_ROOT/.codex/rules" \
-  "$TARGET_ROOT/.codex/migrations" "$TARGET_ROOT/.codex/registries" "$TARGET_ROOT/.codex/hooks.json" \
-  "$TARGET_ROOT/.codex/project-config.defaults.json" "$TARGET_ROOT/.codex/framework-version" \
-  "$TARGET_ROOT/.codex/apexyard-adapter.json"
-cp -R "$OUT_AGENTS/skills" "$TARGET_ROOT/.agents/skills"
+adapter_skills_sync "$OUT_AGENTS/skills" "$TARGET_ROOT/.agents/skills"
+reset_codex_output
 cp -R "$OUT_CODEX/agents" "$TARGET_ROOT/.codex/agents"
 cp "$OUT_CODEX/hooks.json" "$TARGET_ROOT/.codex/hooks.json"
 cp "$OUT_CODEX/apexyard-adapter.json" "$TARGET_ROOT/.codex/apexyard-adapter.json"
