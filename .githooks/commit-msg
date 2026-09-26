@@ -1,0 +1,44 @@
+#!/bin/bash
+# .githooks/commit-msg — strip AI attribution lines from every commit
+# message (#12, AgDR-0167).
+#
+# Agents add lines such as `Co-Authored-By: Claude …`, `Claude-Session: …`
+# and the `Generated with Claude Code` footer to the commits they write.
+# This hook removes them before Git records the commit. It runs for every
+# author and every harness, because Git calls it, not the agent.
+#
+# The hook strips instead of rejecting. An agent that its harness tells to
+# add a trailer would otherwise fail and retry the same commit. The hook
+# prints one line for each line it removes, so the change is visible.
+#
+# The pattern list lives in .claude/hooks/_lib-attribution.sh and is
+# configurable via .claude/project-config.json → .attribution.blocked_patterns.
+#
+# RESIDUALS: `git commit --no-verify` skips this hook, and a clone without
+# `core.hooksPath=.githooks` never runs it. block-ai-attribution.sh covers
+# agent-driven commits in both cases.
+
+MSG_FILE="${1:-}"
+[ -n "$MSG_FILE" ] && [ -f "$MSG_FILE" ] || exit 0
+
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+LIB="$REPO_ROOT/.claude/hooks/_lib-attribution.sh"
+if [ ! -f "$LIB" ]; then
+  echo "WARN: $LIB not found. AI attribution lines were not stripped from this commit." >&2
+  exit 0
+fi
+# shellcheck source=/dev/null
+. "$LIB"
+
+found=$(attribution_find < "$MSG_FILE")
+[ -n "$found" ] || exit 0
+
+stripped=$(mktemp) || exit 0
+if attribution_strip < "$MSG_FILE" > "$stripped" && [ -s "$stripped" ]; then
+  cat "$stripped" > "$MSG_FILE"
+  printf '%s\n' "$found" | while IFS= read -r line; do
+    echo "commit-msg: removed AI attribution line: $line" >&2
+  done
+fi
+rm -f "$stripped"
+exit 0

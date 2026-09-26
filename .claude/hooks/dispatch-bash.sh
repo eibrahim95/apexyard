@@ -68,6 +68,7 @@ run_hook() {
 # APEXYARD_DISPATCH_GATE: Bash|git commit *|require-agdr-for-arch-changes.sh
 # APEXYARD_DISPATCH_GATE: Bash|git commit *|block-agent-routing-drift.sh
 # APEXYARD_DISPATCH_GATE: Bash|git commit *|warn-bootstrap-scope.sh
+# APEXYARD_DISPATCH_GATE: Bash|git commit *|block-ai-attribution.sh
 # APEXYARD_DISPATCH_GATE: Bash|gh issue create *|suggest-ticket-template.sh
 # APEXYARD_DISPATCH_GATE: Bash|gh issue create *|validate-issue-structure.sh
 # APEXYARD_DISPATCH_GATE: Bash|gh issue create *|block-private-refs-in-public-repos.sh
@@ -75,6 +76,8 @@ run_hook() {
 # APEXYARD_DISPATCH_GATE: Bash|gh pr create *|block-private-refs-in-public-repos.sh
 # APEXYARD_DISPATCH_GATE: Bash|gh pr create *|require-agdr-for-arch-pr.sh
 # APEXYARD_DISPATCH_GATE: Bash|gh pr create *|nudge-control-adversarial-test.sh
+# APEXYARD_DISPATCH_GATE: Bash|gh pr create *|block-ai-attribution.sh
+# APEXYARD_DISPATCH_GATE: Bash|gh pr edit *|block-ai-attribution.sh
 # APEXYARD_DISPATCH_GATE: Bash|gh issue comment *|block-private-refs-in-public-repos.sh
 # APEXYARD_DISPATCH_GATE: Bash|gh pr comment *|block-private-refs-in-public-repos.sh
 # APEXYARD_DISPATCH_GATE: Bash|gh pr review *|block-private-refs-in-public-repos.sh
@@ -89,6 +92,7 @@ run_hook() {
 # APEXYARD_DISPATCH_GATE: Bash|gh pr merge *|require-design-review-for-ui.sh
 # APEXYARD_DISPATCH_GATE: Bash|gh pr merge *|block-merge-on-red-ci.sh
 # APEXYARD_DISPATCH_GATE: Bash|gh pr merge *|require-architecture-review.sh
+# APEXYARD_DISPATCH_GATE: Bash|gh pr merge *|block-ai-attribution.sh
 # APEXYARD_DISPATCH_GATE: Bash|glab mr merge *|block-unreviewed-merge.sh
 # APEXYARD_DISPATCH_GATE: Bash|glab mr merge *|require-design-review-for-ui.sh
 # APEXYARD_DISPATCH_GATE: Bash|glab mr merge *|block-merge-on-red-ci.sh
@@ -144,6 +148,7 @@ case "$COMMAND" in
     run_hook require-agdr-for-arch-changes.sh
     run_hook block-agent-routing-drift.sh
     run_hook warn-bootstrap-scope.sh
+    run_hook block-ai-attribution.sh
     ;;
   "gh issue create "*)
     run_hook suggest-ticket-template.sh
@@ -155,10 +160,12 @@ case "$COMMAND" in
     run_hook block-private-refs-in-public-repos.sh
     run_hook require-agdr-for-arch-pr.sh
     run_hook nudge-control-adversarial-test.sh
+    run_hook block-ai-attribution.sh
     ;;
   "gh issue comment "*) run_hook block-private-refs-in-public-repos.sh ;;
   "gh pr comment "*) run_hook block-private-refs-in-public-repos.sh ;;
   "gh pr review "*) run_hook block-private-refs-in-public-repos.sh ;;
+  "gh pr edit "*) run_hook block-ai-attribution.sh ;;
   "gh issue edit "*) run_hook detect-role-trigger.sh ;;
   "gh api "*)
     run_hook block-private-refs-in-public-repos.sh
@@ -166,6 +173,7 @@ case "$COMMAND" in
     ;;
   "gh pr merge "*)
     run_hook block-private-refs-in-public-repos.sh
+    run_hook block-ai-attribution.sh
     run_merge_gates
     ;;
   "glab mr merge "*)

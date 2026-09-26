@@ -50,6 +50,7 @@ the full rule body here.
 
 - Branch `{type}/{TICKET-ID}-{description}`. PR title `type(scope): description`; link the ticket in the body (`Closes #N`).
 - Never `git add -A`. Never push directly to `main`.
+- No AI attribution lines (co-author trailers, session links, "Generated with" footers) in commits or PRs.
 - One ticket at a time. Each PR is one ticket.
 - Every merge needs an explicit per-PR human nod.
 - No hardcoded secrets.

@@ -264,6 +264,32 @@ if echo "$PR_HEAD_BRANCH" | grep -qE '^release/v[0-9]+\.[0-9]+\.[0-9]+$' || \
   fi
 fi
 
+# Every other squash merge gets an explicit subject and body built from the
+# PR's own commits, with AI attribution lines removed (#12, AgDR-0167).
+# GitHub's default squash body copies each commit message and appends a
+# Co-authored-by line for each co-author trailer it finds. An explicit body
+# stops both. If the commits cannot be read, the merge keeps GitHub's
+# default body and prints a warning. Attribution is not a merge-safety
+# condition, so this does not refuse the merge.
+SQUASH_SUBJECT=""
+SQUASH_BODY_FILE=""
+if [ "$MERGE_STRATEGY" = "squash" ] && [ -z "$RELEASE_BODY_FILE" ] && [ -n "$PR_TITLE" ]; then
+  # shellcheck source=/dev/null
+  . "$MARKER_HOME/.claude/hooks/_lib-attribution.sh"
+  SQUASH_BODY_FILE=$(mktemp)
+  if gh pr view <pr> --repo "$PR_HOST_REPO" --json commits \
+       -q '.commits[] | "* " + .messageHeadline + (if .messageBody != "" then "\n\n" + .messageBody else "" end) + "\n"' 2>/dev/null \
+       | attribution_strip > "$SQUASH_BODY_FILE" && [ -s "$SQUASH_BODY_FILE" ]; then
+    SQUASH_SUBJECT="$PR_TITLE (#<pr>)"
+  else
+    echo "WARN: could not read the PR's commits. GitHub's default squash body may carry AI attribution lines." >&2
+    rm -f "$SQUASH_BODY_FILE"
+    SQUASH_BODY_FILE=""
+  fi
+fi
+MERGE_SUBJECT="${RELEASE_SUBJECT:-$SQUASH_SUBJECT}"
+MERGE_BODY_FILE="${RELEASE_BODY_FILE:-$SQUASH_BODY_FILE}"
+
 # _lib-tracker.sh lives alongside _lib-review-markers.sh, already sourced in
 # step 4 from $MARKER_HOME (the ops fork root, not necessarily git toplevel).
 # shellcheck source=/dev/null
@@ -285,11 +311,11 @@ fi
 # PR you cannot merge the fork's copy; the merge, like every other host call in
 # this skill, must target the base (`<owner/repo>` throughout = $PR_HOST_REPO).
 MERGE_RESULT_FILE=$(mktemp)
-tracker_pr_merge "$PR_HOST_REPO" "<pr>" "${MERGE_STRATEGY}" true "$RELEASE_SUBJECT" "$RELEASE_BODY_FILE" > "$MERGE_RESULT_FILE"
+tracker_pr_merge "$PR_HOST_REPO" "<pr>" "${MERGE_STRATEGY}" true "$MERGE_SUBJECT" "$MERGE_BODY_FILE" > "$MERGE_RESULT_FILE"
 MERGE_RC=$?
 MERGE_RESULT="$(cat "$MERGE_RESULT_FILE")"
 MERGE_SHA=$(printf '%s' "$MERGE_RESULT" | jq -r '.sha // empty' 2>/dev/null)
-rm -f "$MERGE_RESULT_FILE" "$RELEASE_BODY_FILE"
+rm -f "$MERGE_RESULT_FILE" "$RELEASE_BODY_FILE" "$SQUASH_BODY_FILE"
 ```
 
 Sync-class detection stays on `gh pr view` deliberately — sync PRs are a `/release-sync` concept, and `/release-sync` only ever runs against the `gh`-hosted apexyard framework fork itself, never a downstream GitLab-forge managed project. There's nothing to make forge-aware here.
@@ -306,7 +332,7 @@ Sync-class detection stays on `gh pr view` deliberately — sync PRs are a `/rel
 
 Unless `--no-merge` was passed, the preceding block runs the merge in the same turn via the tracker-agnostic adapter — `tracker_pr_merge` in `_lib-tracker.sh` (#759, the same kind-dispatch pattern `tracker_review_submit` uses for review submission, #758) — using the strategy and release metadata it determined.
 
-`$RELEASE_SUBJECT` and `$RELEASE_BODY_FILE` are empty strings for every non-release PR, so the invocation remains the pre-#1136 bare squash/merge/rebase with no `--subject`/`--body-file` for those PRs. `tracker_pr_merge` treats a `""` body_file the same as an omitted one (see `_lib-tracker.sh`'s fail-safe check, which only fires when `body_file` is non-empty).
+`$MERGE_SUBJECT` and `$MERGE_BODY_FILE` carry the release metadata on a release PR. On any other squash merge they carry the attribution-free subject and body built from the PR's commits (#12). They are empty for merge and rebase strategies, and when the commits could not be read. In those cases the invocation remains the bare merge with no `--subject`/`--body-file`. `tracker_pr_merge` treats a `""` body_file the same as an omitted one (see `_lib-tracker.sh`'s fail-safe check, which only fires when `body_file` is non-empty).
 
 `tracker_pr_merge` dispatches on the project's `tracker_kind <owner/repo>` (the same per-project resolution `tracker_review_submit` and `tracker_create` use): a `gh`-kind project runs `gh pr merge <pr> --repo <owner/repo> --squash|--merge|--rebase --delete-branch`; a `glab`-kind project runs the `glab mr merge` equivalent (`--squash`/`--rebase`/no-flag-for-a-plain-merge, `--remove-source-branch`). **Note what actually gates this call:** the `gh`/`glab` command above runs *inside* `_lib-tracker.sh`, a sourced shell function — the merge-gate hooks (`block-unreviewed-merge.sh`, `block-merge-on-red-ci.sh`, `require-design-review-for-ui.sh`, `require-architecture-review.sh`) match the OUTER Bash command text this step actually submits (the `tracker_pr_merge "<owner/repo>" "<pr>" "${MERGE_STRATEGY}" true > "$MERGE_RESULT_FILE"` line above), and that text never literally contains `gh pr merge` or `glab mr merge` — those strings live inside already-sourced library code, not in this step's command. So the wrapper call itself is a dedicated, gate-recognised merge shape in its own right: `is_merge_command` and the PR/repo extractors in `_lib-extract-pr.sh` have a `tracker_pr_merge <owner/repo> <pr> ...` branch (#759), and `settings.json` carries a matching `Bash(tracker_pr_merge *)` matcher for all four hooks, alongside the existing `gh`/`glab` matchers (#764/#767/#793). The gates fire on the wrapper form directly — not by recognising the inner CLI command it happens to run, and ONLY when that form is issued as the bare top-level statement shown above — never inside a `$(...)`.
 

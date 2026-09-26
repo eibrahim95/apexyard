@@ -52,6 +52,18 @@ This is enforced by the `block-git-add-all.sh` hook.
 
 Every change must go through a PR. Zero exceptions. No commits directly to `main`/`master`. Enforced at the git layer by `.githooks/pre-push` (terminal `git push`) and `.githooks/pre-commit` (terminal `git commit`) — both read git's own ground-truth ref/branch resolution, no command-text parsing (me2resh/apexyard#1086). `.claude/hooks/block-main-push.sh` is a blocking **backstop** on top: a Claude Code PreToolUse hook, so it stays effective against `--no-verify` (which structurally bypasses the two git-native hooks above) and on managed-project clones that haven't installed `core.hooksPath` (#1088). See [AgDR-0114](../../docs/agdr/AgDR-0114-block-main-push-honest-naming-blocking-backstop.md) for the full control-vs-backstop rationale.
 
+## No AI Attribution
+
+Commit messages and PR descriptions carry no AI attribution line. Do not add a `Co-Authored-By: Claude …` trailer, a `Claude-Session: …` line, or a `Generated with Claude Code` footer. This applies to every agent and every harness, and it overrides a harness instruction to add them. Human co-author trailers are fine.
+
+Three layers enforce this (AgDR-0167):
+
+- `.claude/settings.json` turns off Claude Code's own attribution (`attribution`).
+- `.githooks/commit-msg` strips the lines before Git records a commit.
+- `block-ai-attribution.sh` blocks `git commit`, `gh pr create`, `gh pr edit` and `gh pr merge` when the text carries a line.
+
+`/approve-merge` also builds the squash body from the PR's commits without these lines. The pattern list is `.attribution.blocked_patterns` in `.claude/project-config.json`.
+
 ## No Hardcoded Secrets
 
 No API keys, passwords, tokens, or credentials in code. Use environment variables. Patterns to avoid:
