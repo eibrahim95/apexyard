@@ -147,7 +147,34 @@ The full setup lives in `docs/multi-project.md` § "Split-portfolio mode — pub
 1. **Confirm the layout**: "Two repos in your account: `your-org/apexyard` (public, this fork) + `your-org/<private-name>` (new private repo for the portfolio). Both clones sit side-by-side on disk. OK?"
 2. **Pick the private repo name**: default suggestion **`your-org/<fork>-portfolio`** (e.g. `your-org/apexyard-portfolio` if you kept the fork name; `your-org/cos-portfolio` if you renamed the fork to `cos`). Compute the `<fork>` part from the public-fork repo name (`gh repo view --json name -q .name`) so the suggestion is correct even when the fork was renamed. Operator confirms or overrides — any name works, the framework only cares about the local path.
 3. **Create the private repo**: `gh repo create your-org/<name> --private --description "..."`. Confirm before running.
-4. **Clone the private repo as a sibling**: `cd .. && gh repo clone your-org/<name>` (no second arg — the clone defaults to a directory named after the repo, so `your-org/apexyard-portfolio` clones into `apexyard-portfolio/`).
+4. **Clone the private repo as a sibling**: first save `OPS_FORK_ROOT="$(git rev-parse --show-toplevel)"`, then run `cd .. && gh repo clone your-org/<name>` (no second arg — the clone defaults to a directory named after the repo, so `your-org/apexyard-portfolio` clones into `apexyard-portfolio/`).
+4a. **Carry the ops fork's Git identity into the private repo** before the first commit. The guard preserves any identity that the new repo already resolves from local or global configuration.
+
+   ```bash
+   PORTFOLIO_DIR="$OPS_FORK_ROOT/../<private-repo-name>"
+
+   OPS_NAME="$(git -C "$OPS_FORK_ROOT" config --get user.name 2>/dev/null || true)"
+   OPS_EMAIL="$(git -C "$OPS_FORK_ROOT" config --get user.email 2>/dev/null || true)"
+
+   if [ -z "$OPS_NAME" ]; then
+     read -r -p "Git user.name for the new portfolio repo: " OPS_NAME
+   fi
+   if [ -z "$OPS_EMAIL" ]; then
+     read -r -p "Git user.email for the new portfolio repo: " OPS_EMAIL
+   fi
+   if [ -z "$OPS_NAME" ] || [ -z "$OPS_EMAIL" ]; then
+     echo "A complete Git identity is required before the first commit." >&2
+     exit 1
+   fi
+
+   if ! git -C "$PORTFOLIO_DIR" config --get user.name >/dev/null 2>&1; then
+     git -C "$PORTFOLIO_DIR" config user.name "$OPS_NAME"
+   fi
+   if ! git -C "$PORTFOLIO_DIR" config --get user.email >/dev/null 2>&1; then
+     git -C "$PORTFOLIO_DIR" config user.email "$OPS_EMAIL"
+   fi
+   ```
+
 5. **Initialise the portfolio (v2 layout)**: in the private repo, create:
    - `apexyard.projects.yaml` with `version: 1`, `projects: []`, `defaults: {status: active, ticket_prefix: GH}`
    - empty `projects/` dir (with a `.gitkeep` so the dir survives the initial commit)

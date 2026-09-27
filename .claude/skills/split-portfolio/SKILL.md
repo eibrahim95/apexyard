@@ -152,8 +152,30 @@ If the repo name already exists in the operator's account, refuse and ask for a 
 #### Step 4 — Push the snapshot to the private repo
 
 ```bash
+OPS_FORK_ROOT="$(git rev-parse --show-toplevel)"
 cd "$SNAPSHOT"
 git init -q
+
+OPS_NAME="$(git -C "$OPS_FORK_ROOT" config --get user.name 2>/dev/null || true)"
+OPS_EMAIL="$(git -C "$OPS_FORK_ROOT" config --get user.email 2>/dev/null || true)"
+if [ -z "$OPS_NAME" ]; then
+  read -r -p "Git user.name for the new portfolio repo: " OPS_NAME
+fi
+if [ -z "$OPS_EMAIL" ]; then
+  read -r -p "Git user.email for the new portfolio repo: " OPS_EMAIL
+fi
+if [ -z "$OPS_NAME" ] || [ -z "$OPS_EMAIL" ]; then
+  echo "A complete Git identity is required before the first commit." >&2
+  exit 1
+fi
+
+if ! git config --get user.name >/dev/null 2>&1; then
+  git config user.name "$OPS_NAME"
+fi
+if ! git config --get user.email >/dev/null 2>&1; then
+  git config user.email "$OPS_EMAIL"
+fi
+
 git checkout -b main
 git add apexyard.projects.yaml projects/
 git commit -q -m "chore: import portfolio snapshot from public fork"

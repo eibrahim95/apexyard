@@ -145,6 +145,7 @@ When the operator provides a Git URL (step 1), clone it immediately before doing
 ```bash
 source "$(git rev-parse --show-toplevel)/.claude/hooks/_lib-read-config.sh"
 source "$(git rev-parse --show-toplevel)/.claude/hooks/_lib-portfolio-paths.sh"
+OPS_FORK_ROOT="$(git rev-parse --show-toplevel)"
 WORKSPACE_DIR=$(portfolio_workspace_dir)
 mkdir -p "$WORKSPACE_DIR"
 
@@ -152,6 +153,29 @@ if [ -d "$WORKSPACE_DIR/<name>/.git" ]; then
   echo "✓ $WORKSPACE_DIR/<name>/ already exists — skipping clone."
 else
   git clone <repo-url> "$WORKSPACE_DIR/<name>"
+fi
+
+PROJECT_DIR="$WORKSPACE_DIR/<name>"
+if [ -d "$PROJECT_DIR/.git" ]; then
+  OPS_NAME="$(git -C "$OPS_FORK_ROOT" config --get user.name 2>/dev/null || true)"
+  OPS_EMAIL="$(git -C "$OPS_FORK_ROOT" config --get user.email 2>/dev/null || true)"
+  if [ -z "$OPS_NAME" ]; then
+    read -r -p "Git user.name for the cloned repo: " OPS_NAME
+  fi
+  if [ -z "$OPS_EMAIL" ]; then
+    read -r -p "Git user.email for the cloned repo: " OPS_EMAIL
+  fi
+  if [ -z "$OPS_NAME" ] || [ -z "$OPS_EMAIL" ]; then
+    echo "A complete Git identity is required before the first commit." >&2
+    exit 1
+  fi
+
+  if ! git -C "$PROJECT_DIR" config --get user.name >/dev/null 2>&1; then
+    git -C "$PROJECT_DIR" config user.name "$OPS_NAME"
+  fi
+  if ! git -C "$PROJECT_DIR" config --get user.email >/dev/null 2>&1; then
+    git -C "$PROJECT_DIR" config user.email "$OPS_EMAIL"
+  fi
 fi
 ```
 
