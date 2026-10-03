@@ -216,6 +216,7 @@ One-line summary per skill; canonical details live in each `.claude/skills/<name
 | `/spike-close` | Disposition gate for spikes — `--promote` files a feature, `--discard` writes a memo |
 | `/prototype` | Create a throwaway UX/demo prototype ticket — answers "what should it look/feel like?" (throwaway; same AgDR + coverage exemptions as `/spike`) |
 | `/prototype-close` | Disposition gate for prototypes — `--promote` files a feature, `--discard` writes a memo (mirror of `/spike-close`) |
+| `/prototype-full-ui` | Orchestrate a parallel, mobile-first clickable static-HTML prototype of every screen from a PRD and screen inventory |
 | `/walking-skeleton` | Scaffold a `[Feature]`-class ticket for the thinnest end-to-end slice through every architectural layer — **kept** and grown into the product (full SDLC; NOT exempt) |
 | `/codify-rule` | Turn a review comment that caught a Rex-miss into a draft handbook entry |
 | `/investigation` | Create an investigation ticket + live-doc for sustained root-cause work |
