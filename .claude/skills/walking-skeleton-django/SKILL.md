@@ -87,6 +87,25 @@ Core model: the server owns the page and the client animates it. This is a hyper
   - Make Basecoat follow the same theme. Check how Basecoat selects its dark palette. If it uses a different hook than `data-theme`, bridge the two with a custom variant or a token mapping.
 - Use this folder layout: `templates/cotton/` (components, including a theme toggle), `templates/layouts/` (base, app, auth), `templates/partials/` (fragments), `templates/pages/`, `static/js/` (`app.js` and `compilers/`), `static/css/`, and `unpoly_mixins.py`.
 
+## Docker policy
+
+The skill decides Docker once. Later steps refer to this section.
+
+- Cookiecutter runs with `use_docker=y`.
+- Generation needs Docker. With `use_docker=y`, the cookiecutter hook builds a small image and runs `uv add` inside it. The hook exits with an error if the Docker daemon is not running.
+- Local development uses `.venv`, the justfile, and Zed tasks. It does not use Docker.
+- Keep the generated local compose files. A teammate may use them.
+- Do not edit or delete the generated local compose files.
+- Adapt the generated production Dockerfile and start script in place for Cloud Run. Do not write new ones.
+- Terraform and Cloud Build deploy the app. `docker-compose.production.yml` and Traefik are not used for deployment.
+
+| Generated file | Action |
+|----------------|--------|
+| `docker-compose.local.yml`, `docker-compose.docs.yml`, `compose/local/`, `.devcontainer/` | Keep. Unused locally. |
+| `docker-compose.production.yml`, `compose/production/traefik/`, `compose/production/postgres/` | Keep as reference. Not used to deploy. |
+| `compose/production/django/` (Dockerfile, `start`, Celery scripts) | Adapt for the Cloud Run image (step 12). |
+| `justfile` | Keep the compose recipes. Add the Celery recipes from step 9 and the Tailwind recipes from step 10. |
+
 ## Component toolbox (use the lightest tool that works)
 
 Pick the first option in this list that meets the need. Move down only when the option above cannot do the job.
@@ -164,10 +183,11 @@ Resolve the workspace and docs paths. Show the planned repo path, the docs path,
 ### 4. Generate the project
 
 1. Check that the cookiecutter CLI is installed. If it is not, search for the current install instructions. Install it the way the operator's tooling prefers. `uv tool install cookiecutter` is the usual route. Tell the operator what you installed.
+   Then run `docker info`. If Docker is missing or its daemon is not running, stop. Tell the operator to start Docker before you generate. The cookiecutter hook needs it (see "Docker policy").
 2. Run cookiecutter on `https://github.com/cookiecutter/cookiecutter-django` with `--no-input` and `--output-dir <workspace_dir>`. Pass every option below as `key=value`. Pass the operator's answers from step 1 for the asked options. Accept the template defaults for everything not listed.
    - From step 1: `project_name`, `project_slug`, `description`, `author_name`, `domain_name`, `email`, `open_source_license`, `username_type`, `postgresql_version`, `mail_service`, `rest_api`, `ci_tool`.
    - Pinned, never asked:
-     - `use_docker=n`. Local work uses `.venv`, and Terraform replaces docker-compose. See the note below.
+     - `use_docker=y`. Cookiecutter then generates the production Dockerfile, the production start scripts, and the justfile. Local work does not use Docker. See "Docker policy".
      - `use_async=y`. The app runs on ASGI.
      - `frontend_pipeline=None`. Tailwind v4 and Basecoat replace it.
      - `use_whitenoise=y`. Cloud Run serves static files from the container.
@@ -177,13 +197,16 @@ Resolve the workspace and docs paths. Show the planned repo path, the docs path,
      - `editor=None`.
    - Keep the allauth setup that cookiecutter generates. Configure no social providers.
    - Cookiecutter has no prompt for the Python version or for Channels. Set Python 3.14 and install Django Channels yourself in step 9.
-   - This skill supports only `use_docker=n`. If the operator asks for Docker, stop and confirm. The skill deletes Docker-compose files and writes its own Dockerfile.
-3. Make sure the generated project is a git repository. Run `git init` if cookiecutter did not. Use `main` as the default branch.
-4. Make the first commit on `main` from the untouched cookiecutter output, with the message `chore: initial cookiecutter-django output`. This commit stays local. The operator pushes it.
+   - If the operator asks for `use_docker=n`, stop and confirm. Steps 9, 10, and 12 use the justfile and the production Docker files that only `use_docker=y` generates.
+3. Cookiecutter names the directory after `project_slug`. Rename it to `<app-name>`.
+   If cookiecutter created a `.venv`, delete it. The venv holds absolute paths that the rename breaks. Step 9 creates a new one.
+4. Check that these generated files exist: `justfile`, `compose/production/django/Dockerfile`, `compose/production/django/start`, and `docker-compose.local.yml`. If one is missing, stop and ask the operator.
+5. Make sure the generated project is a git repository. Run `git init` if cookiecutter did not. Use `main` as the default branch.
+6. Make the first commit on `main` from the untouched cookiecutter output, with the message `chore: initial cookiecutter-django output`. This commit stays local. The operator pushes it.
 
 ### 5. Check the tools
 
-Check that these tools are installed: `uv`, `just`, `gh`, `terraform`, the `tailwindcss` CLI, and a Redis server. Report what is missing. Ask before you install anything on the operator's machine.
+Check that these tools are installed: `uv`, `just`, `gh`, `terraform`, the `tailwindcss` CLI, a Redis server, and `docker`. Step 4 already checked that the Docker daemon runs. Report what is missing. Ask before you install anything on the operator's machine.
 
 ### 6. Create the GitHub repository
 
@@ -195,6 +218,7 @@ Check that these tools are installed: `uv`, `just`, `gh`, `terraform`, the `tail
    - On no, go on.
    - On yes, list the projects with `gh project list --owner <owner>`. Ask which one. Show the exact `gh project link <number> --owner <owner> --repo <owner>/<app-name>` command and wait for the go before you run it.
    - If the command fails because the token lacks the `project` scope, give the operator the `gh auth refresh -s project` command. Do not run it.
+   - Record the project owner and number. Step 7 needs them. If the operator chose no project, step 7 skips the project fields and says so in the report.
 6. Do not register the app yet. Registration is a write to the portfolio, so it waits for the ticket in step 8.
 
 ### 7. File the walking-skeleton ticket
@@ -246,6 +270,24 @@ proven early and we build the product on top of it.
 
 Labels: `enhancement`. Do not apply `spike`. There is no `walking-skeleton` exemption label.
 
+#### Ticket metadata (show it with the ticket, and get it confirmed in the same yes)
+
+Register every ticket this skill creates in the linked GitHub Project. Give each ticket this metadata. Show it next to the ticket body:
+
+| Field | Value | Where it is set |
+|-------|-------|-----------------|
+| Project | The project from step 6 | `gh project item-add` |
+| Status | `Ready` | Project field |
+| Milestone | Default `Walking skeleton`. Reuse it if it exists. Create it if it does not. | The issue's milestone |
+| Labels | `enhancement`, plus any label the operator names. Create a missing label before you apply it. | The issue |
+| Size | Suggest `L`. Options are `XS`, `S`, `M`, `L`, `XL`. | Project `Size` field |
+| Priority | Suggest `P0`. Options are `P0`, `P1`, `P2`. | Project `Priority` field |
+| Start date | Today | Project `Start date` field |
+| Target date (due date) | Ask the operator. There is no default. If the operator gives none, leave it empty and say so in the report. | Project `Target date` field, and the milestone due date |
+| Dependencies | Ask which tickets block this one, or which this one blocks. For the first ticket in a repo the answer is none. | The issue's dependency links |
+
+Never invent a date, a size, or a dependency. Ask one focused question for each value that is missing. Give a recommendation with each question.
+
 Create the ticket through the tracker abstraction:
 
 ```bash
@@ -277,6 +319,21 @@ url="$(printf '%s' "$result" | jq -r '.url')"
 
 If the tracker is `none`, the script stops after it prints the ticket. Tell the operator to file the ticket in the external tracker. Continue from step 8 only after the operator gives you the ticket number.
 
+#### 7b. Register the ticket in the project and set its metadata
+
+Run this right after the ticket exists. Use plain `gh` commands with an explicit `--repo` or `--owner` on each. Run them one at a time, so a failure names the step that failed.
+
+1. Milestone. List all milestones with `gh api "repos/<owner>/<app-name>/milestones?state=all" --paginate`. If a milestone with the chosen title exists and has no due date, ask the operator before you set one. If the title is missing, create it with `gh api repos/<owner>/<app-name>/milestones -f title="<title>" -f due_on="<target date>T12:00:00Z"`. Use noon UTC, because GitHub shows a midnight UTC date as the previous day in timezones behind UTC. Omit `due_on` when there is no target date. Then run `gh issue edit <ref> --repo <owner>/<app-name> --milestone "<title>"`.
+2. Labels. Check each label with `gh label list --repo <owner>/<app-name> --limit 200`. Create a missing one with `gh label create "<label>" --repo <owner>/<app-name>`. Apply it with `gh issue edit <ref> --repo <owner>/<app-name> --add-label "<label>"`.
+3. Project item. Run `gh project item-add <number> --owner <owner> --url <issue url> --format json`. Keep the returned item `id`. Run `gh project view <number> --owner <owner> --format json` for the project `id`.
+4. Project fields. Run `gh project field-list <number> --owner <owner> --format json` for the field and option ids. Never guess an id. If the project lacks a field or an option, skip that field and report it. Do not create project fields. Set each field with `gh project item-edit --id <item id> --project-id <project id> --field-id <field id> ...`:
+   - `Status`, `Size`, and `Priority` use `--single-select-option-id <option id>`.
+   - `Start date` and `Target date` use `--date YYYY-MM-DD`.
+5. Dependencies. Link each ticket that blocks this one. For each blocking ticket, read its numeric id with `gh api repos/<owner>/<repo>/issues/<n> --jq .id`. Then run `gh api -X POST repos/<owner>/<app-name>/issues/<ref>/dependencies/blocked_by -F issue_id=<id>`. For a ticket that this one blocks, run the same call on that ticket's number with this ticket's id. If the API rejects a call, add a `Blocked by <owner>/<repo>#<n>` line to the ticket body. Report that the native link failed.
+6. Verify. Read the item back with `gh project item-list <number> --owner <owner> --format json --limit 200`. Check that the milestone, labels, size, priority, status, and dates match what the operator confirmed. Read the dependency links back with `gh api repos/<owner>/<app-name>/issues/<ref>/dependencies/blocked_by`. Report any field that does not match. Do not report a field as set until you have read it back.
+
+If the `project` token scope is missing, give the operator `gh auth refresh -s project`. Do not run it. The ticket stays filed. Report which fields are still unset.
+
 ### 8. Start the ticket and branch
 
 1. Run `/start-ticket {owner/repo}#${ref}`.
@@ -288,14 +345,14 @@ Put the app's docs in `<projects_dir>/<app-name>/docs/`. If the operator wants a
 
 ### 9. Local environment and cleanup
 
-- Run `uv venv` and activate `.venv`. Use no Docker for local development.
+- Run `uv venv` and activate `.venv`. Use no Docker for local development. Leave the generated compose files in place (see "Docker policy").
 - Set the `USE_DOCKER` default to False in `config/settings/local.py` with `env("USE_DOCKER", default=False)`.
 - Switch off `ATOMIC_REQUESTS`.
 - Fix `{project_slug}/contrib/sites/migrations/0003_set_site_domain_and_name.py` to work with SQLite. The `if created` block becomes `if created and not is_sqlite:`. Detect SQLite from the database engine in the normal way.
 - Remove `python-slugify`, `django-crispy-forms`, and `crispy-bootstrap5` from the dependencies and from `base.py`.
 - Create a sample `.env`. Include `DATABASE_URL` and `REDIS_URL` for the Celery broker.
 - Local development has no Docker, so Redis runs on the host. Set `REDIS_URL` to the local Redis in the sample `.env`. Put the command to start Redis in the final report and in the README.
-- Keep the Celery worker and beat running through justfile recipes, not docker compose.
+- Keep the Celery worker and beat running through new justfile recipes that call `uv run celery` directly. Do not use the compose recipes for them.
 - If the operator chose SQLite for tests, hardcode the test database in `config/settings/test.py`. Place this block after the existing imports and settings. It replaces any `DATABASES` the file inherits:
 
   ```python
@@ -326,7 +383,7 @@ Put the app's docs in `<projects_dir>/<app-name>/docs/`. If the operator wants a
 - Add two Tailwind recipes to the justfile:
   - `tailwind-build` runs `tailwindcss -i ./src/css/tailwind.css -o ./<project_slug>/static/css/tailwind.css --minify`.
   - `tailwind-watch` runs the same command with `--watch --minify`.
-- Remove any docker compose recipes from the justfile. List what you removed in the final report. Terraform replaces docker-compose in this project.
+- Keep the generated docker compose recipes in the justfile. Add the new recipes beside them.
 - Commit the generated `tailwind.css`. Rebuild it after every template or CSS change. Add a CI step that rebuilds it and fails if the committed file is stale.
 
 ### 11. Add release-please
@@ -339,7 +396,7 @@ Put the app's docs in `<projects_dir>/<app-name>/docs/`. If the operator wants a
 
 ### 12. Add Terraform
 
-Add Terraform in an `infra/` directory in place of docker-compose.
+Add Terraform in an `infra/` directory. It replaces `docker-compose.production.yml` for deployment.
 
 - Target GCP. Pin the provider and Terraform versions. Declare inputs as variables. Write no secrets in any file.
 - There are two environments, `dev` and `prod`.
@@ -355,10 +412,17 @@ Add Terraform in an `infra/` directory in place of docker-compose.
 - Create the state bucket outside this Terraform code. Say how to create it in the README.
 - Enable the needed Google APIs with `google_project_service`: Cloud Run, Cloud Build, Artifact Registry, Compute Engine, Secret Manager, and IAM.
 - **Container image.**
-  - Cookiecutter does not generate a Dockerfile when `use_docker=n`. Write one production Dockerfile. It installs dependencies with `uv` and runs `collectstatic`. It serves the ASGI app (`use_async=y`) with gunicorn and the uvicorn worker class, as the generated production settings document.
-  - The Django service, the Celery worker, and Celery beat all use this one image. They differ only in the start command.
-  - Cookiecutter does not generate `compose/production/django/start` when `use_docker=n`, so write it. It is a bash script that the Dockerfile `CMD` runs for the Django service. It runs `python /app/manage.py migrate --noinput`, then the gunicorn command from the Dockerfile.
-  - This start script is the only migration path. Add no separate migrate job.
+  - Adapt the generated files in `compose/production/django/`. Change only what Cloud Run needs. List each change in the final report.
+  - The Django service, the Celery worker, and Celery beat all use the one image. They differ only in the command.
+  - The generated `Dockerfile` already installs dependencies with `uv`. It sets `ENTRYPOINT ["/entrypoint"]` and sets no `CMD`. Add `CMD ["/start"]` after the `ENTRYPOINT`, so the Django service runs `/start` by default. The Celery worker pool and the Celery beat pool override the command with `/start-celeryworker` and `/start-celerybeat`.
+  - The generated `start` script runs `collectstatic` and then `gunicorn config.asgi` with the uvicorn worker class. It does not run `migrate`, and it binds port 5000. Make two changes and keep the rest of the script:
+    - Add `python /app/manage.py migrate --noinput` after `collectstatic` and before `gunicorn`.
+    - Change the bind to `0.0.0.0:${PORT:-8080}`, because Cloud Run sets `PORT`.
+  - The generated `entrypoint` runs with `set -o nounset`. It reads `POSTGRES_USER`, `POSTGRES_HOST`, and `POSTGRES_PORT`, and it waits for that host and port. It exits if one variable is unset. Keep the entrypoint. Set all three variables on every Cloud Run workload in Terraform, next to `DATABASE_URL`:
+    - `POSTGRES_HOST` is the internal IP address of the database host.
+    - `POSTGRES_PORT` is `5432`.
+    - `POSTGRES_USER` is the database user from `DATABASE_URL`.
+  - The `start` script is the only migration path. Add no separate migrate job.
   - If the operator chose a default superuser, add these lines to the start script right after the `migrate` line. Replace `[[admin]]` with the operator's local part and `[[domain]]` with the domain from step 1 when you write the file. Do not leave the placeholders in it.
 
     ```bash
@@ -422,7 +486,7 @@ Add `.zed/tasks.json` so each local process starts from the Zed task picker. Mak
   - "Celery Worker" runs `uv run celery -A config.celery_app worker --loglevel=info`.
   - "Celery Beat" runs `uv run celery -A config.celery_app beat --loglevel=info`.
   - "Run pytest" runs `uv run pytest --cov=<project_slug> --cov-report=html --cov-report=term`.
-- If you add justfile recipes for the worker and beat, make the Zed tasks call those recipes instead.
+- Make the Zed tasks call the justfile recipes for the worker and beat that step 9 added.
 
 ### 14. Write AGENTS.md
 
@@ -466,13 +530,15 @@ Remind the operator that this is a KEPT skeleton and goes through the full SDLC.
 ## Rules
 
 1. **Ask when needed, never by reflex.** Do not re-ask what this skill decides. Ask one question at a time. The step 1 input batch is the one exception.
+   If you change a pinned cookiecutter option, check every step that mentions it before you run.
 2. **Confirm outward-facing actions.** The GitHub repo, the project link, and the ticket each need a yes.
 3. **KEPT, not throwaway.** Do not apply the `spike` label or any exemption label.
 4. **Nothing pushes and nothing applies.** Do not run `git push` or `terraform apply`. The operator runs them.
 5. **Use Basecoat first.** Never hand-roll a component that Basecoat ships.
 6. **Do not install django-unicorn or tetra** in the skeleton.
-7. **Branch name.** Always `feature/GH-<ticket>-walking-skeleton`.
-8. **Report what is not verified.** Do not describe an unrun check as passed.
+7. **Register every ticket.** Add each ticket this skill creates to the linked GitHub Project. Set its milestone, labels, size, priority, dates, and dependencies (step 7b). Read the fields back before you report them as set.
+8. **Branch name.** Always `feature/GH-<ticket>-walking-skeleton`.
+9. **Report what is not verified.** Do not describe an unrun check as passed.
 
 ## Where this sits in the SDLC
 
