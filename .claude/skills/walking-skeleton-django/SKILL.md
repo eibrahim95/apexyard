@@ -319,7 +319,7 @@ If the tracker is `none`, the script stops after it prints the ticket. Tell the 
 
 Run this right after the ticket exists. Use plain `gh` commands with an explicit `--repo` or `--owner` on each. Run them one at a time, so a failure names the step that failed.
 
-1. Milestone. List the milestones with `gh api repos/<owner>/<app-name>/milestones`. If the chosen title is missing, create it with `gh api repos/<owner>/<app-name>/milestones -f title="<title>" -f due_on="<target date>T00:00:00Z"`. Omit `due_on` when there is no target date. Then run `gh issue edit <ref> --repo <owner>/<app-name> --milestone "<title>"`.
+1. Milestone. List the milestones with `gh api repos/<owner>/<app-name>/milestones`. If the chosen title is missing, create it with `gh api repos/<owner>/<app-name>/milestones -f title="<title>" -f due_on="<target date>T12:00:00Z"`. Use noon UTC, because GitHub shows a midnight UTC date as the previous day in timezones behind UTC. Omit `due_on` when there is no target date. Then run `gh issue edit <ref> --repo <owner>/<app-name> --milestone "<title>"`.
 2. Labels. Check each label with `gh label list --repo <owner>/<app-name>`. Create a missing one with `gh label create`. Apply it with `gh issue edit <ref> --repo <owner>/<app-name> --add-label "<label>"`.
 3. Project item. Run `gh project item-add <number> --owner <owner> --url <issue url> --format json`. Keep the returned item `id`. Run `gh project view <number> --owner <owner> --format json` for the project `id`.
 4. Project fields. Run `gh project field-list <number> --owner <owner> --format json` for the field and option ids. Never guess an id. Then set each field with `gh project item-edit --id <item id> --project-id <project id> --field-id <field id> ...`:
