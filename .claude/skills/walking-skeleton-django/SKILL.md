@@ -147,6 +147,7 @@ Parse `$ARGUMENTS` as `<app-name> — <purpose>`. Ask only for what is missing, 
 | Mail service | `mail_service` option: Mailgun, Amazon SES, Mailjet, Mandrill, Postmark, Sendgrid, Brevo, SparkPost, or Other SMTP. |
 | REST API | `rest_api` option: None, DRF, or Django Ninja. Recommend None unless the purpose needs an API. |
 | CI tool | `ci_tool` option: None, Travis, Gitlab, Github, or Drone. Recommend Github. |
+| SQLite for tests | Whether to hardcode the test database in `config/settings/test.py` to SQLite (step 9). Recommend yes, so tests need no Postgres. |
 
 Ask for these in one batch of focused questions, each with its recommended answer, so the operator can accept the defaults in one reply. Do not ask for anything the "Generate the project" step pins.
 
@@ -290,6 +291,18 @@ Put the app's docs in `<projects_dir>/<app-name>/docs/`. If the operator wants a
 - Create a sample `.env`. Include `DATABASE_URL` and `REDIS_URL` for the Celery broker.
 - Local development has no Docker, so Redis runs on the host. Set `REDIS_URL` to the local Redis in the sample `.env`. Put the command to start Redis in the final report and in the README.
 - Keep the Celery worker and beat running through justfile recipes, not docker compose.
+- If the operator chose SQLite for tests, hardcode the test database in `config/settings/test.py`. Place this block after the existing imports and settings. It replaces any `DATABASES` the file inherits:
+
+  ```python
+  DATABASES = {
+      "default": {
+          "ENGINE": "django.db.backends.sqlite3",
+          "NAME": BASE_DIR / "db.sqlite3",
+      },
+  }
+  ```
+
+  `BASE_DIR` arrives through the star import from `base.py`, so ruff reports F405. Do not add `# noqa`. Import `BASE_DIR` explicitly (`from .base import BASE_DIR`) or use the ruff per-file-ignore the generated config already supports. Make sure `db.sqlite3` is git-ignored.
 - Install Django Channels. Cookiecutter does not add it, so wire it by hand:
   - Add `channels` and `channels-redis` with `uv add`.
   - Add `"channels"` to `THIRD_PARTY_APPS` in `config/settings/base.py`.
@@ -299,7 +312,7 @@ Put the app's docs in `<projects_dir>/<app-name>/docs/`. If the operator wants a
   - Set `CHANNEL_LAYERS` in `base.py` to `channels_redis.core.RedisChannelLayer`, with `hosts` read from `REDIS_URL`. Override it with `channels.layers.InMemoryChannelLayer` in `config/settings/test.py`, so tests need no Redis.
   - Keep Channels out of the Celery wiring. Celery stays the task queue and Channels stays the websocket layer. They share the one Redis, but use different keys.
   - Record the dependency choice in an AgDR with `/decide`. Adding a dependency is a material decision.
-- Do not create the Postgres database. Put the exact command in the final report. Run the tests and the skeleton check against SQLite with `DATABASE_URL=sqlite:///db.sqlite3`. Tests run Celery tasks eagerly, so they need no Redis.
+- Do not create the Postgres database. Put the exact command in the final report. Run the skeleton check against SQLite with `DATABASE_URL=sqlite:///db.sqlite3`. Run the tests against SQLite too, through the hardcoded test settings when the operator chose them, otherwise through the same `DATABASE_URL`. Tests run Celery tasks eagerly, so they need no Redis.
 
 ### 10. Add the frontend stack
 
