@@ -98,6 +98,7 @@ Do not use `code-reviewer` for a reviewer. It writes approval markers and posts 
 ## Step 2: Foundation (lead model, three agents in sequence)
 
 **2a. Design agent (`ui-designer`).**
+
 1. Download the vendor libraries and fonts (`BRIEF/stack.md`). Check each file.
 2. Run `impeccable init` seeded from the PRD. Write `PRODUCT.md`. Report missing answers to the orchestrator. Ask the operator only for what the PRD cannot answer.
 3. Write `PRODUCT-RULES.md`: every testable rule in the PRD user stories and edge cases, one line each, with the story ID. A reviewer checks screens against it.
@@ -106,13 +107,15 @@ Do not use `code-reviewer` for a reviewer. It writes approval markers and posts 
 6. Write `assets/app.css`: tokens, `@font-face`, Basecoat token overrides, theme keyframes. Nothing else.
 
 **2b. Build agent (`frontend-engineer`).**
+
 1. Write `assets/data.js` and `assets/app.js` (Alpine store, prototype-controls drawer) per `BRIEF/data-spec.md`.
 2. Build the app shell and one reference screen, the home screen: sidebar on desktop, bottom bar on phone, top bar, content area.
-3. Build **every fragment** the inventory implies (modals, drawers, sheets) in `fragments/`. Write `fragments/manifest.json`. Phase 3 screens link to these by path.
+3. Build **every fragment** the inventory implies (modals, drawers, sheets) in `fragments/`. Write `fragments/manifest.json`. Step 3 screens link to these by path.
 4. Write `index.html`: all screens grouped by journey, one link each.
 5. Write `tools/`: a generator for `assets/link-map.json` from the inventory JSON, a link checker, a screenshot script (widths 390, 820, 1440), and a journey walker. Run the generator.
 
 **2c. Gate agent (`ui-designer`).**
+
 1. Run `impeccable critique` and `impeccable audit` on the reference screen. Sweep widths from 320 to 1920 px, plus portrait and landscape phone. Report only.
 2. Run one round: you send the findings to 2b, it fixes, 2c re-runs once. Do not start Step 3 while a blocker or major remains. A bad foundation is copied into every screen.
 
@@ -123,6 +126,7 @@ Group the inventory screens by journey. Spawn one `frontend-engineer` per group,
 Check the inventory so every screen ID has exactly one owner. Give an unowned screen to the lightest agent and log it. Put the hardest screen (usually the core work surface) in a group of its own.
 
 **Each brief is short.** It gives paths, not pasted text:
+
 - Read `BRIEF/stack.md`, `BRIEF/responsive.md`, `PRODUCT.md`, `DESIGN.md`, `PRODUCT-RULES.md`, `assets/data.js`, `assets/link-map.json`, `fragments/manifest.json`, the craft-floor path, and the reference screen. Match its shell, spacing, and component use.
 - The screen IDs it owns, with the inventory rows pasted in.
 - The report format from `BRIEF/stack.md`, rule 10.
@@ -182,6 +186,7 @@ Propose one or two extra touches the PRD does not ask for. Mark each `EXTRA` in 
 ## Final report to the operator
 
 In this order:
+
 1. The path to `OUT` and the command to run it: `cd <OUT> && python3 -m http.server 8080`.
 2. How many screens work, and which do not.
 3. What is faked.
