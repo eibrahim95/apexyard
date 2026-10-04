@@ -67,7 +67,7 @@ Core model: the server owns the page and the client animates it. This is a hyper
 - Django 6.x handles routing, ORM, auth, and business logic.
 - django-basecoat is the UI library for the whole app. It is Basecoat (the shadcn/ui design system without React) as django-cotton components. Make full use of it.
   - Before you build any UI, read the django-basecoat README and its demo site (https://django-basecoat.ignacemaes.com/). List the components it ships. Record that list in the new repo's AGENTS.md.
-  - Build every screen from Basecoat components: button, card, input, select, checkbox, dialog, dropdown menu, tabs, table, alert, badge, breadcrumb, avatar, accordion, and the rest of what it ships.
+  - Build every screen from Basecoat components. These include button, card, input, select, checkbox, dialog, dropdown menu, tabs, table, alert, badge, breadcrumb, avatar, and accordion. Use the rest of what it ships too.
   - When a needed element has no django-basecoat component, use the Basecoat CSS classes directly. Wrap the result in a project cotton component in `templates/cotton/`.
   - Write a custom component only when neither Basecoat option exists. Never hand-roll a dropdown, dialog, select, or tabs.
   - Style the app through Basecoat's theme tokens. Do not add a second component library. Do not use Web Awesome.
@@ -177,7 +177,7 @@ Resolve the workspace and docs paths. Show the planned repo path, the docs path,
      - `editor=None`.
    - Keep the allauth setup that cookiecutter generates. Configure no social providers.
    - Cookiecutter has no prompt for the Python version or for Channels. Set Python 3.14 and install Django Channels yourself in step 9.
-   - If the operator asked for `use_docker=y`, stop and confirm. The rest of this skill assumes `n`: it deletes Docker-compose files and writes its own Dockerfile.
+   - This skill supports only `use_docker=n`. If the operator asks for Docker, stop and confirm. The skill deletes Docker-compose files and writes its own Dockerfile.
 3. Make sure the generated project is a git repository. Run `git init` if cookiecutter did not. Use `main` as the default branch.
 4. Make the first commit on `main` from the untouched cookiecutter output, with the message `chore: initial cookiecutter-django output`. This commit stays local. The operator pushes it.
 
@@ -364,7 +364,7 @@ Add Terraform in an `infra/` directory in place of docker-compose.
     ```bash
     if [ -n "${DJANGO_DEFAULT_SUPERUSER_PASSWORD:-}" ]; then
       SUPERUSER_EXISTS=$(echo "from django.contrib.auth import get_user_model;User=get_user_model();print(User.objects.filter(email=\"${DJANGO_DEFAULT_SUPERUSER_USERNAME:-[[admin]]@[[domain]]}\").count())" | python /app/manage.py shell --no-imports)
-      test $SUPERUSER_EXISTS == 0 && DJANGO_SUPERUSER_PASSWORD=${DJANGO_DEFAULT_SUPERUSER_PASSWORD} python /app/manage.py createsuperuser --email ${DJANGO_DEFAULT_SUPERUSER_USERNAME:-[[admin]]@[[domain]]} --noinput || true
+      test $SUPERUSER_EXISTS == 0 && DJANGO_SUPERUSER_PASSWORD="${DJANGO_DEFAULT_SUPERUSER_PASSWORD}" python /app/manage.py createsuperuser --email ${DJANGO_DEFAULT_SUPERUSER_USERNAME:-[[admin]]@[[domain]]} --noinput || true
     fi
     ```
 
@@ -452,6 +452,7 @@ Report in plain language. Lead with the outcome. Then give:
 - What is verified, with the command and the result.
 - What is not verified, and why. The first deploy is always on this list, because the operator runs it.
 - The manual steps left for the operator:
+  - Add the secret values in Secret Manager for each environment. If `DJANGO_DEFAULT_SUPERUSER_PASSWORD` has no value, the start script creates no admin and prints nothing.
   - Push `main` and the feature branch.
   - Create the Postgres database on the host or the database VM.
   - Start Redis locally.
@@ -460,11 +461,11 @@ Report in plain language. Lead with the outcome. Then give:
 
 Remove the active-issue-skill marker.
 
-Remind the operator that this is a KEPT skeleton and goes through the full SDLC: tests with > 80% coverage, Rex review, the security gate, and all merge gates. Build real features on top of the merged skeleton, one ticket at a time.
+Remind the operator that this is a KEPT skeleton and goes through the full SDLC. That means tests with > 80% coverage, Rex review, the security gate, and all merge gates. Build real features on top of the merged skeleton, one ticket at a time.
 
 ## Rules
 
-1. **Ask when needed, never by reflex.** Do not re-ask what this skill decides. Ask one question at a time.
+1. **Ask when needed, never by reflex.** Do not re-ask what this skill decides. Ask one question at a time. The step 1 input batch is the one exception.
 2. **Confirm outward-facing actions.** The GitHub repo, the project link, and the ticket each need a yes.
 3. **KEPT, not throwaway.** Do not apply the `spike` label or any exemption label.
 4. **Nothing pushes and nothing applies.** Do not run `git push` or `terraform apply`. The operator runs them.
