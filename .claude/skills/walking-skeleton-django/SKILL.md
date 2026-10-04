@@ -147,6 +147,7 @@ Parse `$ARGUMENTS` as `<app-name> — <purpose>`. Ask only for what is missing, 
 | Mail service | `mail_service` option: Mailgun, Amazon SES, Mailjet, Mandrill, Postmark, Sendgrid, Brevo, SparkPost, or Other SMTP. |
 | REST API | `rest_api` option: None, DRF, or Django Ninja. Recommend None unless the purpose needs an API. |
 | CI tool | `ci_tool` option: None, Travis, Gitlab, Github, or Drone. Recommend Github. |
+| Default superuser | Whether the production start script creates a default superuser, and the local part of its email (default `admin`). The email becomes `<admin>@<domain_name>` using the domain from this table. Recommend yes. |
 | SQLite for tests | Whether to hardcode the test database in `config/settings/test.py` to SQLite (step 9). Recommend yes, so tests need no Postgres. |
 
 Ask for these in one batch of focused questions, each with its recommended answer, so the operator can accept the defaults in one reply. Do not ask for anything the "Generate the project" step pins.
@@ -342,6 +343,15 @@ Add Terraform in an `infra/` directory in place of docker-compose.
 - **Container image.**
   - Cookiecutter does not generate a Dockerfile when `use_docker=n`. Write one production Dockerfile that installs dependencies with `uv`, runs `collectstatic`, and serves the ASGI app (`use_async=y`) with gunicorn and the uvicorn worker class, the way the generated production settings document it.
   - The Django service, the Celery worker, and Celery beat all use this one image. They differ only in the start command.
+  - Cookiecutter does not generate `compose/production/django/start` when `use_docker=n`, so write it. It is a bash script that the Dockerfile `CMD` runs for the Django service. It runs `python /app/manage.py migrate --noinput`, then the gunicorn command from the Dockerfile.
+  - If the operator chose a default superuser, add these lines to the start script right after the `migrate` line. Replace `[[admin]]` with the operator's local part and `[[domain]]` with the domain from step 1 when you write the file. Do not leave the placeholders in it.
+
+    ```bash
+    SUPERUSER_EXISTS=$(echo "from django.contrib.auth import get_user_model;User=get_user_model();print(User.objects.filter(email=\"${DJANGO_DEFAULT_SUPERUSER_USERNAME:-[[admin]]@[[domain]]}\").count())" | python manage.py shell --no-imports)
+    test $SUPERUSER_EXISTS == 0 && DJANGO_SUPERUSER_PASSWORD=${DJANGO_DEFAULT_SUPERUSER_PASSWORD:-superadmin} python manage.py createsuperuser --email ${DJANGO_DEFAULT_SUPERUSER_USERNAME:-[[admin]]@[[domain]]} --noinput || true
+    ```
+
+  - The `superadmin` fallback password is public. In Terraform, store `DJANGO_DEFAULT_SUPERUSER_PASSWORD` in Secret Manager and pass it to the Cloud Run service as a secret reference, so production never uses the fallback. Tell the operator in the final report to change the password after the first login. If `username_type` is `username`, adjust the `filter` and `createsuperuser` calls to match the user model.
 - **Build and registry.**
   - Artifact Registry: one Docker repository for the app images.
   - Add a cleanup policy that deletes untagged images.
@@ -365,7 +375,7 @@ Add Terraform in an `infra/` directory in place of docker-compose.
   - Add firewall rules that allow only Postgres (5432) and Redis (6379), and only from the Cloud Run subnet.
   - Allow SSH to the instance only through IAP. Add Cloud NAT for outbound traffic from the instance.
 - **Storage.** A GCS bucket for media, with uniform bucket-level access. Give the Django service account access to this bucket only. Configure Django to use it through `django-storages`.
-- **Secrets.** Store `DJANGO_SECRET_KEY`, `DATABASE_URL`, and `REDIS_URL` in Secret Manager. Pass them to the Cloud Run workloads as secret references.
+- **Secrets.** Store `DJANGO_SECRET_KEY`, `DATABASE_URL`, `REDIS_URL`, and (when a default superuser was chosen) `DJANGO_DEFAULT_SUPERUSER_PASSWORD` in Secret Manager. Pass them to the Cloud Run workloads as secret references.
 - Add outputs for the Cloud Run URL, the registry path, and the media bucket name.
 - Run `terraform fmt` and `terraform validate`. Do not run `terraform apply`.
 
