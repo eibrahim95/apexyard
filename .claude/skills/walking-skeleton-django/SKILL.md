@@ -366,6 +366,7 @@ Add `.zed/tasks.json` so each local process starts from the Zed task picker. Mak
 - Add these tasks:
   - "Tailwind CSS Watch" runs `just tailwind-watch`.
   - "Django Server" runs `uv run python manage.py runserver`. Pick a port that is free on this machine and does not clash with another project in the portfolio. Do not leave it at 8000 if something already uses it.
+  - "uvicorn Server" runs `uv run uvicorn config.asgi:application --host 0.0.0.0 --port 7002 --reload`. This is the ASGI entrypoint and the only local server that serves websockets, because `runserver` does not run the Channels router without daphne. Use port 7002 unless it is taken, and keep it different from the "Django Server" port. Add `uvicorn` as a dev dependency with `uv add --dev uvicorn` if the generated project does not already include it.
   - "Celery Worker" runs `uv run celery -A config.celery_app worker --loglevel=info`.
   - "Celery Beat" runs `uv run celery -A config.celery_app beat --loglevel=info`.
   - "Run pytest" runs `uv run pytest --cov=<project_slug> --cov-report=html --cov-report=term`.
@@ -387,7 +388,7 @@ Write an `AGENTS.md` in the new repo. It lists the stack, the architecture rules
 - Build one trivial slice: a home page made from Basecoat components. Use at least a button, a card, a dropdown menu, and a dialog that opens in an Unpoly layer. Compose them in one project cotton component. Add a Tailwind class. The theme toggle must work, and Basecoat must follow the dark theme.
 - Add one test for the page.
 - Add a trivial Celery task named `ping`. Add a test that runs it eagerly.
-- Add a trivial websocket consumer on `ws/ping/` that replies `pong`. Add a test that connects with `channels.testing.WebsocketCommunicator`, sends a message, and checks the reply. Use the in-memory channel layer.
+- Add a trivial websocket consumer on `ws/ping/` that replies `pong`. Add a test that connects with `channels.testing.WebsocketCommunicator`, sends a message, and checks the reply. Use the in-memory channel layer. When you run the app, start it with the "uvicorn Server" task command so the websocket route is reachable.
 - Run `pytest`, `mypy`, and `pre-commit`. Report the exact results.
 - Run the app and check the page in a browser. If you cannot run a browser, say which criteria you could not verify there.
 
