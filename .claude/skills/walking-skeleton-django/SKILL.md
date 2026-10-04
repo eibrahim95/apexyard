@@ -365,8 +365,8 @@ Add `.zed/tasks.json` so each local process starts from the Zed task picker. Mak
 - Set `DJANGO_SETTINGS_MODULE` to `config.settings.local` and `DJANGO_READ_DOT_ENV_FILE` to `True` in `env` for every Django and Celery task.
 - Add these tasks:
   - "Tailwind CSS Watch" runs `just tailwind-watch`.
-  - "Django Server" runs `uv run python manage.py runserver`. Pick a port that is free on this machine and does not clash with another project in the portfolio. Do not leave it at 8000 if something already uses it.
-  - "uvicorn Server" runs `uv run uvicorn config.asgi:application --host 0.0.0.0 --port 7002 --reload`. This is the ASGI entrypoint and the only local server that serves websockets, because `runserver` does not run the Channels router without daphne. Use port 7002 unless it is taken, and keep it different from the "Django Server" port. Add `uvicorn` as a dev dependency with `uv add --dev uvicorn` if the generated project does not already include it.
+  - "Django Server" runs `uv run python manage.py runserver 0.0.0.0:8881`. Use port 8881.
+  - "uvicorn Server" runs `uv run uvicorn config.asgi:application --host 0.0.0.0 --port 8882 --reload`. This is the ASGI entrypoint and the only local server that serves websockets, because `runserver` does not run the Channels router without daphne. Use port 8882. The "Django Server" task uses 8881. Add `uvicorn` as a dev dependency with `uv add --dev uvicorn` if the generated project does not already include it.
   - "Celery Worker" runs `uv run celery -A config.celery_app worker --loglevel=info`.
   - "Celery Beat" runs `uv run celery -A config.celery_app beat --loglevel=info`.
   - "Run pytest" runs `uv run pytest --cov=<project_slug> --cov-report=html --cov-report=term`.
