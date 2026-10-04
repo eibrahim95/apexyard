@@ -34,10 +34,10 @@ No custom CSS in any screen or fragment.
 
 - Style only with Tailwind utility classes and Basecoat classes.
 - Forbidden in `screens/` and `fragments/`: `<style>` blocks, `style="…"` attributes, and hand-named classes. The token-block fallback below is the only exception to the `<style>` ban.
-- One exception: data-driven colours, such as book covers or avatars. Bind them with Alpine, for example `:style="{'--c1': item.c1, '--c2': item.c2}"`. Style them with utilities such as `bg-linear-to-br from-(--c1) to-(--c2)`.
-- `assets/app.css` is the only CSS file. It holds design tokens, `@font-face`, Basecoat token overrides, and keyframes declared in the theme. The design-foundation agent writes it once. Nobody else edits it.
+- One exception: data-driven colours, such as entity images or avatars. Bind them with Alpine, for example `:style="{'--c1': item.c1, '--c2': item.c2}"`. Style them with utilities such as `bg-linear-to-br from-(--c1) to-(--c2)`.
+- `assets/app.css` is the only CSS file, apart from `assets/tokens.css` when the fallback below is in use. It holds design tokens, `@font-face`, Basecoat token overrides, and keyframes declared in the theme. Only an agent in the 2a role edits it. Tokens are frozen after Step 2.
 - Tailwind's browser build compiles inline `<style type="text/tailwindcss">` blocks. It may not compile a linked file. Verify this against the pinned version. The design agent records the working token mechanism in `DESIGN.md`.
-- Fallback, only if the browser build cannot read `assets/app.css`: the design agent writes the token block once in `assets/tokens.css`. Every page carries one identical copy between `<!-- tokens:start -->` and `<!-- tokens:end -->`, inside a `<style type="text/tailwindcss">` element. Builders paste it unchanged. The CSS checks ignore that marked region. Nothing else may use `<style>`.
+- Fallback, only if the browser build cannot read `assets/app.css`: the design agent writes the token block once in `assets/tokens.css`. Every page carries one identical copy of it in a `<style type="text/tailwindcss">` element. The markers `<!-- tokens:start -->` and `<!-- tokens:end -->` wrap the whole element. Builders paste it unchanged. The CSS checks ignore that marked region. Nothing else may use `<style>`.
 - Container queries use Tailwind's `@container` and `@md:` variants. Fluid type uses `text-[clamp(…)]` with a `rem` term, or a theme token.
 - If you need a style that no utility or Basecoat class gives, report it. Do not write CSS.
 
@@ -61,12 +61,12 @@ No custom CSS in any screen or fragment.
 Mark each reusable piece with a comment so a developer can turn it into a Cotton component later:
 
 ```html
-<!-- c-component: book-card  props: book -->
+<!-- c-component: entity-card  props: item -->
 <article class="card"> … </article>
 <!-- /c-component -->
 ```
 
-Use it for the pieces that repeat: app shell, page header, empty state, banner, progress indicator, and the card for each main entity in the PRD. Repeat the markup in each page. Do not build a runtime include system.
+Mark each repeated piece. The repeated pieces are the app shell, page header, empty state, banner, progress indicator, and the card for each main entity in the PRD. Repeat the markup in each page. Do not build a runtime include system.
 
 ## Server markers
 

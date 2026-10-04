@@ -106,7 +106,7 @@ Do not use `code-reviewer` for a reviewer. It writes approval markers and posts 
 3. Write `PRODUCT-RULES.md`: every testable rule in the PRD user stories and edge cases, one line each, with the story ID. A reviewer checks screens against it.
 4. Run `impeccable shape` for the home screen: the task, the one primary action, the first-viewport content.
 5. Write `DESIGN.md`: the three choices, tokens, the token mechanism that works with the Tailwind browser build, and the responsive list from `BRIEF/responsive.md`.
-6. Write `assets/app.css`: tokens, `@font-face`, Basecoat token overrides, theme keyframes. Nothing else. If the browser build cannot read it, also write `assets/tokens.css` (see `BRIEF/stack.md`). You are the only agent that edits these files.
+6. Write `assets/app.css`: tokens, `@font-face`, Basecoat token overrides, theme keyframes. Nothing else. If the browser build cannot read it, also write `assets/tokens.css` (see `BRIEF/stack.md`). Only an agent in the 2a role edits these files. Tokens are frozen after Step 2.
 
 **2b. Build agent (`frontend-engineer`).**
 
@@ -119,9 +119,9 @@ Do not use `code-reviewer` for a reviewer. It writes approval markers and posts 
 
 **2c. Gate agent (`ui-designer`).** A separate agent from 2a and 2b. It reports and fixes nothing.
 
-1. You run the sweep script on the reference screen first. Give the agent the image folder and `sweep-report.json`. The agent runs no browser. It marks any criterion it could not see as "not browser-verified".
+1. You run the sweep script on the reference screen first. Give the agent the image folder and `sweep-report.json`. The agent runs no browser. It marks any criterion it could not see as "not verified".
 2. The agent runs `impeccable critique` and `impeccable audit` on the reference screen, from the source, the images, and the report.
-3. Run one fix round. Send findings on `assets/app.css`, `DESIGN.md`, or `PRODUCT.md` to a new lead-model agent in the 2a role. Send findings on the shell, the reference screen, fragments, or tools to 2b. Then run the sweep and a fresh 2c once more.
+3. Run one fix round. Send findings on `assets/`, `DESIGN.md`, or `PRODUCT.md` to a new lead-model agent in the 2a role. Send findings on the shell, the reference screen, fragments, or tools to 2b. Then run the sweep and a fresh 2c once more.
 4. Do not start Step 3 while a blocker or major remains. A bad foundation is copied into every screen.
 
 ## Step 3: Build (implementer model, parallel)
@@ -148,15 +148,15 @@ Send each implementer its own review. It fixes all blockers and majors, and mino
 
 ## Step 6: Integration
 
-1. Run the link checker over every HTML file. Send broken links to the owning agent.
+1. Run the link checker over every HTML file. Send broken links to the owning agent. This fix does not count against the round cap.
 2. Confirm every inventory ID has a file and the count matches the inventory.
-3. Run the journey walker for every journey. Run the screenshot script into `screenshots/`. Name files `<screen-id>-<width>.png`.
-4. Spawn a lead-model `ui-designer` as a critic. It runs `impeccable critique` on five screens: home, the core work surface, the main creation flow, the main detail screen, and the main conversion or payment screen. It works from the source, the images, and `sweep-report.json`. It runs no browser. It reports and fixes nothing.
+3. Run the journey walker for every journey. Run the screenshot script in default mode into `screenshots/`, and in sweep mode into `screenshots/sweep/`. Name files `<screen-id>-<width>.png`. The sweep must run after the Step 5 fixes.
+4. Spawn a lead-model `ui-designer` as a critic. It runs `impeccable critique` on five screens. It works from the source, the images, and the new `sweep-report.json`. It runs no browser. It reports and fixes nothing. The five screens are home, the core work surface, the main creation flow, the main detail screen, and the main conversion or payment screen.
 5. Spawn one reviewer-model agent to compare five random screens against the PRD acceptance criteria. It reports and fixes nothing.
-6. Run the one extra fix round. Send each finding from items 4 and 5 to the implementer that owns the file. Send a finding on `assets/app.css` to a lead-model agent in the 2a role. Log what remains.
+6. Run the one extra fix round. Send each finding from items 4 and 5 on a screen to the implementer that owns it. Send a finding on the shell, the home screen, `fragments/`, or `tools/` to 2b. Send a finding on `assets/` or `DESIGN.md` to a lead-model agent in the 2a role. Log a finding that needs a token change. Tokens stay frozen. Log what remains.
 7. Write `README.md` (run command first, what is faked, screen map) and `NOTES.md` (gaps, assumptions, inventory disagreements, sample values, `EXTRA` items, anything not verified).
 
-Stop after Step 7. If a blocker remains, log it in `NOTES.md` and finish.
+Stop after Step 6. If a blocker remains, log it in `NOTES.md` and finish.
 
 ## Output structure
 
@@ -164,7 +164,7 @@ Stop after Step 7. If a blocker remains, log it in `NOTES.md` and finish.
 OUT/
   PRODUCT.md  DESIGN.md  PRODUCT-RULES.md      design context (OUT root)
   README.md  NOTES.md  index.html
-  assets/   app.css  app.js  data.js  link-map.json  vendor/ (libs, fonts/)
+  assets/   app.css  [tokens.css]  app.js  data.js  link-map.json  vendor/ (libs, fonts/)
   screens/  one folder per journey, one file per inventory ID, lowercase
   fragments/  manifest.json  …                  built in Step 2
   tools/    link-map generator, link checker, screenshot script, journey walker
@@ -184,7 +184,7 @@ Propose one or two extra touches the PRD does not ask for. Mark each `EXTRA` in 
 - [ ] `index.html` lists every inventory screen. Each opens.
 - [ ] Every journey clicks through end to end with no dead link.
 - [ ] No horizontal page scroll from about 320 px to 1920 px, in portrait and landscape, in light and dark.
-- [ ] `grep` finds no `<style` block and no `style=` attribute in `screens/` or `fragments/`, apart from the data-driven colour binding and the marked token block when the fallback is in use.
+- [ ] `grep` finds no `<style` block and no `style=` attribute in `screens/` or `fragments/`. The colour binding and the marked token block are exempt.
 - [ ] `impeccable detect` reports no errors on `screens/` and `fragments/`.
 - [ ] The prototype-controls drawer works and its state survives navigation and reload.
 - [ ] Reviews exist in `reviews/`. Every blocker and major is fixed or logged.
@@ -205,7 +205,7 @@ In this order:
 
 1. **No code from the orchestrator.** Delegate every script and every fix.
 2. **Models are asked, never hardcoded.** The reviewer model reviews every implementer-model screen. No agent reviews its own output. A critic or gate agent reports. A different agent fixes.
-3. **No custom CSS** outside `assets/app.css`. The reviewer greps for it.
+3. **No custom CSS** outside `assets/app.css` and the marked token block (see `BRIEF/stack.md`). The reviewer greps for it.
 4. **No AI attribution lines** in any file.
 5. **Never claim a check passed unless it ran.** Write "not verified" instead.
 6. **Advisory output.** The prototype gates nothing. It informs the design direction. It does not replace `/design-review` or the design gate on real UI work.
