@@ -148,6 +148,7 @@ Parse `$ARGUMENTS` as `<app-name> — <purpose>`. Ask only for what is missing, 
 | REST API | `rest_api` option: None, DRF, or Django Ninja. Recommend None unless the purpose needs an API. |
 | CI tool | `ci_tool` option: None, Travis, Gitlab, Github, or Drone. Recommend Github. |
 | Default superuser | Whether the production start script creates a default superuser, and the local part of its email (default `admin`). The email becomes `<admin>@<domain_name>` using the domain from this table. Recommend yes. |
+| GCP projects | The project ID for `dev` and the project ID for `prod`. Recommend two separate projects, for blast-radius isolation. If the operator gives one project, every resource name carries an environment suffix. Never invent a project ID. If the operator does not know them yet, leave the variable empty and say so in the report. |
 | SQLite for tests | Whether to hardcode the test database in `config/settings/test.py` to SQLite (step 9). Recommend yes, so tests need no Postgres. |
 
 Ask for these in one batch of focused questions, each with its recommended answer, so the operator can accept the defaults in one reply. Do not ask for anything the "Generate the project" step pins.
@@ -216,10 +217,11 @@ proven early and we build the product on top of it.
 - [ ] The home page renders from Basecoat components and follows the theme toggle
 - [ ] A trivial Celery task has a test that runs it eagerly
 - [ ] Django Channels is installed and registered (`INSTALLED_APPS`, ASGI router, Redis channel layer), and a trivial websocket consumer has a test
-- [ ] `terraform fmt` and `terraform validate` pass for the full GCP stack
+- [ ] `terraform fmt` and `terraform validate` pass for the full GCP stack in both `dev` and `prod`
 - [ ] The Docker image builds through Cloud Build and kaniko
+- [ ] A push to `main` deploys to `dev`, and a `vX.Y.Z` release tag deploys to `prod`
 - [ ] The operator performs the first deploy and a smoke test passes against
-      the live Cloud Run URL
+      the live `dev` Cloud Run URL, then against the `prod` URL after the first release tag
 - [ ] The slice's logic has tests with > 80% coverage (KEPT code, not
       spike-exempt) and passes Rex and the security gate
 
@@ -228,12 +230,11 @@ proven early and we build the product on top of it.
 - Basecoat / Cotton / Unpoly / Alpine / Tailwind frontend with dark mode
 - Celery worker and beat, Django Channels, justfile recipes, Zed tasks
 - release-please
-- GCP Terraform: build, registry, Cloud Run, database host, network, media bucket
+- GCP Terraform for two environments (dev on push to main, prod on release tag): build, registry, Cloud Run, database host, network, media bucket
 
 ## Out of Scope (built later on the skeleton)
 - Business features, real auth providers, email, monitoring and alerting
 - Custom domain and managed TLS
-- Separate dev and prod environments
 - django-unicorn and tetra
 
 ## Glossary
@@ -331,14 +332,20 @@ Put the app's docs in `<projects_dir>/<app-name>/docs/`. If the operator wants a
 - Use release-type `python`.
 - Add `uv.lock` as an `extra-files` entry of type `toml`, so the project version in the lockfile is bumped with each release. Use the jsonpath `$.package[?(@.name.value=='<app-name>')].version`.
 - Start the manifest at the version the project is generated with.
+- Set `"include-component-in-tag": false`, so release tags are plain `vX.Y.Z`. The production deploy trigger in step 12 matches that tag shape.
 
 ### 12. Add Terraform
 
 Add Terraform in an `infra/` directory in place of docker-compose.
 
 - Target GCP. Pin the provider and Terraform versions. Declare inputs as variables. Write no secrets in any file.
-- Split the code into modules under `infra/modules/`: apis, network, registry, build, database, storage, secrets, and run. Use one root module that wires them together.
-- Add a backend block for remote state in a GCS bucket, with the bucket name as a variable. The state bucket is created outside this Terraform code. Say how to create it in the README.
+- There are two environments, `dev` and `prod`.
+  - `dev` deploys automatically on every push to `main`.
+  - `prod` deploys when release-please pushes a `vX.Y.Z` tag.
+  - Split the code into modules under `infra/modules/`: apis, network, registry, build, database, storage, secrets, and run. Put no environment-specific values in the modules.
+  - Add two root modules, `infra/envs/dev/` and `infra/envs/prod/`. Each one wires the same modules with its own `terraform.tfvars` (no secrets), its own `environment` variable, its own GCP project ID variable, and its own state prefix. The two environments share no state, so a change to `dev` can never touch `prod`.
+  - Give prod larger defaults only where the operator asks. Both environments use the same small sizes at first.
+- Add a backend block in each root module for remote state in a GCS bucket, with the bucket name as a variable and `prefix` set to the environment name. The state bucket is created outside this Terraform code. Say how to create it in the README.
 - Enable the needed Google APIs with `google_project_service`: Cloud Run, Cloud Build, Artifact Registry, Compute Engine, Secret Manager, and IAM.
 - **Container image.**
   - Cookiecutter does not generate a Dockerfile when `use_docker=n`. Write one production Dockerfile that installs dependencies with `uv`, runs `collectstatic`, and serves the ASGI app (`use_async=y`) with gunicorn and the uvicorn worker class, the way the generated production settings document it.
@@ -358,7 +365,15 @@ Add Terraform in an `infra/` directory in place of docker-compose.
   - Add `cloudbuild.yaml` that builds the image with kaniko and its layer cache, then pushes it to Artifact Registry. Tag each image with the commit SHA.
   - Kaniko writes its cache as tagged images, so the untagged-image policy will not remove it. Give the cache its own repository or path, with an age-based cleanup policy.
   - Check that the kaniko executor image you choose is still published and maintained. If it is not, tell the operator before you pick a replacement.
-  - Add a Cloud Build trigger for pushes to `main`, and a service account for Cloud Build with only the roles it needs.
+  - Add one `cloudbuild.yaml` for both environments. It takes the substitutions `_ENV` and `_PROJECT_ID`. After the image is pushed, it deploys that image to the Cloud Run service and to both worker pools of the target environment. The migrate and superuser steps run in the container start script.
+  - Add two Cloud Build triggers in each environment's project, each with its own service account that has only the roles it needs:
+    - `dev` trigger: fires on a push to the `main` branch and runs `cloudbuild.yaml` with `_ENV=dev`.
+    - `prod` trigger: fires on a push of a tag that matches `^v[0-9]+\.[0-9]+\.[0-9]+$` and runs `cloudbuild.yaml` with `_ENV=prod`. Turn on the trigger's manual approval option. Recommend it, and tell the operator how to turn it off.
+  - Terraform creates the Cloud Run resources, but Cloud Build owns their image. Add `lifecycle { ignore_changes }` on the container image, so a later `terraform apply` does not roll a deploy back.
+  - The prod build rebuilds the image from the tagged commit. Kaniko's cache keeps this fast. Note in the AgDR that promoting the dev image instead is the alternative.
+  - Connecting the GitHub repo to Cloud Build is a one-time manual step in the console. Terraform cannot do it without an operator login. Put the steps in the README and the final report.
+  - Check that a tag pushed by release-please still fires the Cloud Build trigger. Release-please tags through the GitHub API. If a webhook is not delivered for that tag, say so in the report and suggest the fix, such as a fine-grained token for the release workflow.
+  - Record this CI/CD and environment design in an AgDR with `/decide`.
 - **Cloud Run workloads.**
   - A Cloud Run service for the Django app.
   - A Cloud Run worker pool for the Celery worker.
@@ -377,7 +392,7 @@ Add Terraform in an `infra/` directory in place of docker-compose.
 - **Storage.** A GCS bucket for media, with uniform bucket-level access. Give the Django service account access to this bucket only. Configure Django to use it through `django-storages`.
 - **Secrets.** Store `DJANGO_SECRET_KEY`, `DATABASE_URL`, `REDIS_URL`, and (when a default superuser was chosen) `DJANGO_DEFAULT_SUPERUSER_PASSWORD` in Secret Manager. Pass them to the Cloud Run workloads as secret references.
 - Add outputs for the Cloud Run URL, the registry path, and the media bucket name.
-- Run `terraform fmt` and `terraform validate`. Do not run `terraform apply`.
+- Run `terraform fmt` and run `terraform validate` in both `infra/envs/dev/` and `infra/envs/prod/`. Do not run `terraform apply`.
 
 ### 13. Add Zed tasks
 
@@ -426,7 +441,8 @@ Report in plain language. Lead with the outcome. Then give:
   - Push `main` and the feature branch.
   - Create the Postgres database on the host or the database VM.
   - Start Redis locally.
-  - Create the Terraform state bucket, then run `terraform apply`.
+  - Create the Terraform state bucket, then run `terraform apply` in `infra/envs/dev/` and in `infra/envs/prod/`.
+  - Connect the GitHub repo to Cloud Build in each GCP project, so the `main` and release-tag triggers can fire.
 
 Remove the active-issue-skill marker.
 
