@@ -1,6 +1,6 @@
 ---
 name: walking-skeleton-django
-description: Bootstrap a new Django app as a walking skeleton — cookiecutter-django, local .venv, GitHub repo, Basecoat/Cotton/Unpoly/Alpine/Tailwind frontend, Celery, release-please, Zed tasks, and GCP Terraform. KEPT and grown; full SDLC (NOT exempt like /spike).
+description: Bootstrap a Django walking skeleton: cookiecutter-django, Basecoat, Celery, Channels, GCP Terraform. Kept; full SDLC.
 argument-hint: "<app-name> — <one-line purpose>"
 allowed-tools: Bash, Read, Write, Edit, WebSearch, WebFetch
 ---
