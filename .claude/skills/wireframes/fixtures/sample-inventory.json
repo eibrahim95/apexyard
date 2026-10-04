@@ -1,0 +1,17 @@
+{
+  "title": "Sample checkout screen wireframes",
+  "screens": [
+    {"id": "hub-cart-01", "journey": "co1", "name": "Cart", "kind": "primary", "platform": "both",
+     "regions": ["List of items with price", "Promo code field", "Checkout action"],
+     "variants": ["Empty cart", "Promo applied", "Loading skeleton"],
+     "entry_from": ["co1-s01"], "exit_to": ["co1-s01"]},
+    {"id": "co1-s01", "journey": "co1", "name": "Pay for order", "kind": "primary", "platform": "both",
+     "regions": ["Order summary and total", "Payment entry (processor TBD)", "Note: taxes shown at confirmation", "Pay action", "Cancel action"],
+     "variants": ["Processing", "Payment failed"],
+     "entry_from": ["hub-cart-01"], "exit_to": ["hub-cart-01", "X-01"], "debatable": true},
+    {"id": "X-01", "journey": "cross-cutting", "name": "Offline: needs a connection", "kind": "state-screen", "platform": "both",
+     "regions": ["Statement: this action needs a connection", "Retry action"],
+     "variants": ["Offline banner on every screen"],
+     "entry_from": ["co1-s01"], "exit_to": ["co1-s01"], "grounded": "no"}
+  ]
+}
