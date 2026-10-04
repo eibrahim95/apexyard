@@ -173,7 +173,7 @@ Resolve the workspace and docs paths. Show the planned repo path, the docs path,
      - `cloud_provider=GCP`, so the generated settings use GCS for media through `django-storages`.
      - `editor=None`.
    - Keep the allauth setup that cookiecutter generates. Configure no social providers.
-   - Cookiecutter has no prompt for the Python version or for Channels. Set Python 3.14 in step 9. Add no Channels.
+   - Cookiecutter has no prompt for the Python version or for Channels. Set Python 3.14 and install Django Channels yourself in step 9.
    - If the operator asked for `use_docker=y`, stop and confirm. The rest of this skill assumes `n`: it deletes Docker-compose files and writes its own Dockerfile.
 3. Make sure the generated project is a git repository. Run `git init` if cookiecutter did not. Use `main` as the default branch.
 4. Make the first commit on `main` from the untouched cookiecutter output, with the message `chore: initial cookiecutter-django output`. This commit stays local. The operator pushes it.
@@ -213,6 +213,7 @@ proven early and we build the product on top of it.
       → Django view → Celery task through Redis → Postgres → GCP deploy path
 - [ ] The home page renders from Basecoat components and follows the theme toggle
 - [ ] A trivial Celery task has a test that runs it eagerly
+- [ ] Django Channels is installed and registered (`INSTALLED_APPS`, ASGI router, Redis channel layer), and a trivial websocket consumer has a test
 - [ ] `terraform fmt` and `terraform validate` pass for the full GCP stack
 - [ ] The Docker image builds through Cloud Build and kaniko
 - [ ] The operator performs the first deploy and a smoke test passes against
@@ -223,7 +224,7 @@ proven early and we build the product on top of it.
 ## In Scope (the wiring)
 - cookiecutter-django project, local .venv, GitHub repo
 - Basecoat / Cotton / Unpoly / Alpine / Tailwind frontend with dark mode
-- Celery worker and beat, justfile recipes, Zed tasks
+- Celery worker and beat, Django Channels, justfile recipes, Zed tasks
 - release-please
 - GCP Terraform: build, registry, Cloud Run, database host, network, media bucket
 
@@ -289,6 +290,15 @@ Put the app's docs in `<projects_dir>/<app-name>/docs/`. If the operator wants a
 - Create a sample `.env`. Include `DATABASE_URL` and `REDIS_URL` for the Celery broker.
 - Local development has no Docker, so Redis runs on the host. Set `REDIS_URL` to the local Redis in the sample `.env`. Put the command to start Redis in the final report and in the README.
 - Keep the Celery worker and beat running through justfile recipes, not docker compose.
+- Install Django Channels. Cookiecutter does not add it, so wire it by hand:
+  - Add `channels` and `channels-redis` with `uv add`.
+  - Add `"channels"` to `THIRD_PARTY_APPS` in `config/settings/base.py`.
+  - Set `ASGI_APPLICATION = "config.asgi.application"` if the generated settings do not already.
+  - Rewrite `config/asgi.py` so it returns a `ProtocolTypeRouter`. The `"http"` entry is the existing Django ASGI app. The `"websocket"` entry is an `AllowedHostsOriginValidator` around an `AuthMiddlewareStack` around a `URLRouter`. Keep the generated `sys.path` and settings-module lines.
+  - Put the websocket routes in `<project_slug>/routing.py`. Put consumers in `<project_slug>/consumers.py`.
+  - Set `CHANNEL_LAYERS` in `base.py` to `channels_redis.core.RedisChannelLayer`, with `hosts` read from `REDIS_URL`. Override it with `channels.layers.InMemoryChannelLayer` in `config/settings/test.py`, so tests need no Redis.
+  - Keep Channels out of the Celery wiring. Celery stays the task queue and Channels stays the websocket layer. They share the one Redis, but use different keys.
+  - Record the dependency choice in an AgDR with `/decide`. Adding a dependency is a material decision.
 - Do not create the Postgres database. Put the exact command in the final report. Run the tests and the skeleton check against SQLite with `DATABASE_URL=sqlite:///db.sqlite3`. Tests run Celery tasks eagerly, so they need no Redis.
 
 ### 10. Add the frontend stack
@@ -377,6 +387,7 @@ Write an `AGENTS.md` in the new repo. It lists the stack, the architecture rules
 - Build one trivial slice: a home page made from Basecoat components. Use at least a button, a card, a dropdown menu, and a dialog that opens in an Unpoly layer. Compose them in one project cotton component. Add a Tailwind class. The theme toggle must work, and Basecoat must follow the dark theme.
 - Add one test for the page.
 - Add a trivial Celery task named `ping`. Add a test that runs it eagerly.
+- Add a trivial websocket consumer on `ws/ping/` that replies `pong`. Add a test that connects with `channels.testing.WebsocketCommunicator`, sends a message, and checks the reply. Use the in-memory channel layer.
 - Run `pytest`, `mypy`, and `pre-commit`. Report the exact results.
 - Run the app and check the page in a browser. If you cannot run a browser, say which criteria you could not verify there.
 
