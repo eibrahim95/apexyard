@@ -214,6 +214,7 @@ Check that these tools are installed: `uv`, `just`, `gh`, `terraform`, the `tail
    - On no, go on.
    - On yes, list the projects with `gh project list --owner <owner>`. Ask which one. Show the exact `gh project link <number> --owner <owner> --repo <owner>/<app-name>` command and wait for the go before you run it.
    - If the command fails because the token lacks the `project` scope, give the operator the `gh auth refresh -s project` command. Do not run it.
+   - Record the project owner and number. Step 7 needs them. If the operator chose no project, step 7 skips the project fields and says so in the report.
 6. Do not register the app yet. Registration is a write to the portfolio, so it waits for the ticket in step 8.
 
 ### 7. File the walking-skeleton ticket
@@ -265,6 +266,24 @@ proven early and we build the product on top of it.
 
 Labels: `enhancement`. Do not apply `spike`. There is no `walking-skeleton` exemption label.
 
+#### Ticket metadata (show it with the ticket, and get it confirmed in the same yes)
+
+Every ticket this skill creates is registered in the linked GitHub Project and carries this metadata. Show it next to the ticket body:
+
+| Field | Value | Where it is set |
+|-------|-------|-----------------|
+| Project | The project from step 6 | `gh project item-add` |
+| Status | `Ready` | Project field |
+| Milestone | Default `Walking skeleton`. Reuse it if it exists. Create it if it does not. | The issue's milestone |
+| Labels | `enhancement`, plus any label the operator names. Create a missing label before you apply it. | The issue |
+| Size | Suggest `L`. Options are `XS`, `S`, `M`, `L`, `XL`. | Project `Size` field |
+| Priority | Suggest `P0`. Options are `P0`, `P1`, `P2`. | Project `Priority` field |
+| Start date | Today | Project `Start date` field |
+| Target date (due date) | Ask the operator. There is no default. If the operator gives none, leave it empty and say so in the report. | Project `Target date` field, and the milestone due date |
+| Dependencies | Ask which tickets block this one, or which this one blocks. For the first ticket in a repo the answer is none. | The issue's dependency links |
+
+Never invent a date, a size, or a dependency. Ask one focused question for each value that is missing. Give a recommendation with each question.
+
 Create the ticket through the tracker abstraction:
 
 ```bash
@@ -295,6 +314,21 @@ url="$(printf '%s' "$result" | jq -r '.url')"
 ```
 
 If the tracker is `none`, the script stops after it prints the ticket. Tell the operator to file the ticket in the external tracker. Continue from step 8 only after the operator gives you the ticket number.
+
+#### 7b. Register the ticket in the project and set its metadata
+
+Run this right after the ticket exists. Use plain `gh` commands with an explicit `--repo` or `--owner` on each. Run them one at a time, so a failure names the step that failed.
+
+1. Milestone. List the milestones with `gh api repos/<owner>/<app-name>/milestones`. If the chosen title is missing, create it with `gh api repos/<owner>/<app-name>/milestones -f title="<title>" -f due_on="<target date>T00:00:00Z"`. Omit `due_on` when there is no target date. Then run `gh issue edit <ref> --repo <owner>/<app-name> --milestone "<title>"`.
+2. Labels. Check each label with `gh label list --repo <owner>/<app-name>`. Create a missing one with `gh label create`. Apply it with `gh issue edit <ref> --repo <owner>/<app-name> --add-label "<label>"`.
+3. Project item. Run `gh project item-add <number> --owner <owner> --url <issue url> --format json`. Keep the returned item `id`. Run `gh project view <number> --owner <owner> --format json` for the project `id`.
+4. Project fields. Run `gh project field-list <number> --owner <owner> --format json` for the field and option ids. Never guess an id. Then set each field with `gh project item-edit --id <item id> --project-id <project id> --field-id <field id> ...`:
+   - `Status`, `Size`, and `Priority` use `--single-select-option-id <option id>`.
+   - `Start date` and `Target date` use `--date YYYY-MM-DD`.
+5. Dependencies. For each blocking ticket, read its numeric id with `gh api repos/<owner>/<repo>/issues/<n> --jq .id`. Then run `gh api -X POST repos/<owner>/<app-name>/issues/<ref>/dependencies/blocked_by -F issue_id=<id>`. If the API rejects the call, add a `Blocked by <owner>/<repo>#<n>` line to the ticket body and report that the native link failed.
+6. Verify. Read the item back with `gh project item-list <number> --owner <owner> --format json`. Check that the milestone, size, priority, status, and dates match what the operator confirmed. Report any field that does not match. Do not report a field as set until you have read it back.
+
+If the `project` token scope is missing, give the operator `gh auth refresh -s project`. Do not run it. The ticket stays filed. Report which fields are still unset.
 
 ### 8. Start the ticket and branch
 
@@ -491,8 +525,9 @@ Remind the operator that this is a KEPT skeleton and goes through the full SDLC.
 4. **Nothing pushes and nothing applies.** Do not run `git push` or `terraform apply`. The operator runs them.
 5. **Use Basecoat first.** Never hand-roll a component that Basecoat ships.
 6. **Do not install django-unicorn or tetra** in the skeleton.
-7. **Branch name.** Always `feature/GH-<ticket>-walking-skeleton`.
-8. **Report what is not verified.** Do not describe an unrun check as passed.
+7. **Register every ticket.** Add each ticket this skill creates to the linked GitHub Project, and set its milestone, labels, size, priority, dates, and dependencies (step 7b). Read the fields back before you report them as set.
+8. **Branch name.** Always `feature/GH-<ticket>-walking-skeleton`.
+9. **Report what is not verified.** Do not describe an unrun check as passed.
 
 ## Where this sits in the SDLC
 
