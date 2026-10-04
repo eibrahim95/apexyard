@@ -137,6 +137,18 @@ Parse `$ARGUMENTS` as `<app-name> — <purpose>`. Ask only for what is missing, 
 | Django project slug | snake_case. Derive it from the app name and confirm it. |
 | One-line purpose | One sentence. |
 | GitHub owner and visibility | The user or org, and private or public. |
+| Description | `description` option. Default to the one-line purpose and ask the operator to confirm or edit it. |
+| Author name | `author_name` option. Offer `git config user.name` as the default. Never leave the template author. |
+| Domain name | `domain_name` option, such as `example.com`. Always ask. There is no useful default. |
+| Author email | `email` option. Offer `git config user.email` as the default. |
+| License | `open_source_license` option: MIT, BSD, GPLv3, Apache Software License 2.0, or Not open source. Recommend MIT. |
+| Username type | `username_type` option: `username` or `email`. Recommend `email`. |
+| PostgreSQL version | `postgresql_version` option: 18, 17, 16, 15, or 14. Recommend the newest. The Terraform VM must run the same version. |
+| Mail service | `mail_service` option: Mailgun, Amazon SES, Mailjet, Mandrill, Postmark, Sendgrid, Brevo, SparkPost, or Other SMTP. |
+| REST API | `rest_api` option: None, DRF, or Django Ninja. Recommend None unless the purpose needs an API. |
+| CI tool | `ci_tool` option: None, Travis, Gitlab, Github, or Drone. Recommend Github. |
+
+Ask for these in one batch of focused questions, each with its recommended answer, so the operator can accept the defaults in one reply. Do not ask for anything the "Generate the project" step pins.
 
 ### 2. Verify the ticket prefix
 
@@ -149,16 +161,20 @@ Resolve the workspace and docs paths. Show the planned repo path, the docs path,
 ### 4. Generate the project
 
 1. Check that the cookiecutter CLI is installed. If it is not, search for the current install instructions for cookiecutter and install it in the way the operator's tooling prefers (`uv tool install cookiecutter` is the usual route). Tell the operator what you installed.
-2. Run cookiecutter on `https://github.com/cookiecutter/cookiecutter-django` with `--output-dir <workspace_dir>`. Use these options and accept the defaults for everything else:
-   - Project name and slug from the inputs.
-   - No Docker (`use_docker=n`).
-   - Postgres.
-   - Python 3.14.
-   - Celery on (`use_celery=y`). Cookiecutter's Celery setup needs Redis as the broker, so keep Redis.
-   - Cloud provider GCP (`cloud_provider=GCP`), so the generated settings use GCS for media through `django-storages`.
-   - No Channels.
-   - MIT license.
+2. Run cookiecutter on `https://github.com/cookiecutter/cookiecutter-django` with `--no-input` and `--output-dir <workspace_dir>`. Pass every option below as `key=value`. Pass the operator's answers from step 1 for the asked options. Accept the template defaults for everything not listed.
+   - From step 1: `project_name`, `project_slug`, `description`, `author_name`, `domain_name`, `email`, `open_source_license`, `username_type`, `postgresql_version`, `mail_service`, `rest_api`, `ci_tool`.
+   - Pinned, never asked:
+     - `use_docker=n`. Local work uses `.venv`, and Terraform replaces docker-compose. See the note below.
+     - `use_async=y`. The app runs on ASGI.
+     - `frontend_pipeline=None`. Tailwind v4 and Basecoat replace it.
+     - `use_whitenoise=y`. Cloud Run serves static files from the container.
+     - `debug=y`. This is the cookiecutter flag that enables debug tooling in the generated local settings. Production settings keep `DEBUG` off.
+     - `use_celery=y`. Cookiecutter's Celery setup needs Redis as the broker, so keep Redis.
+     - `cloud_provider=GCP`, so the generated settings use GCS for media through `django-storages`.
+     - `editor=None`.
    - Keep the allauth setup that cookiecutter generates. Configure no social providers.
+   - Cookiecutter has no prompt for the Python version or for Channels. Set Python 3.14 in step 9. Add no Channels.
+   - If the operator asked for `use_docker=y`, stop and confirm. The rest of this skill assumes `n`: it deletes Docker-compose files and writes its own Dockerfile.
 3. Make sure the generated project is a git repository. Run `git init` if cookiecutter did not. Use `main` as the default branch.
 4. Make the first commit on `main` from the untouched cookiecutter output, with the message `chore: initial cookiecutter-django output`. This commit stays local. The operator pushes it.
 
@@ -301,7 +317,7 @@ Add Terraform in an `infra/` directory in place of docker-compose.
 - Add a backend block for remote state in a GCS bucket, with the bucket name as a variable. The state bucket is created outside this Terraform code. Say how to create it in the README.
 - Enable the needed Google APIs with `google_project_service`: Cloud Run, Cloud Build, Artifact Registry, Compute Engine, Secret Manager, and IAM.
 - **Container image.**
-  - Cookiecutter does not generate a Dockerfile when `use_docker=n`. Write one production Dockerfile that installs dependencies with `uv`, runs `collectstatic`, and serves with gunicorn.
+  - Cookiecutter does not generate a Dockerfile when `use_docker=n`. Write one production Dockerfile that installs dependencies with `uv`, runs `collectstatic`, and serves the ASGI app (`use_async=y`) with gunicorn and the uvicorn worker class, the way the generated production settings document it.
   - The Django service, the Celery worker, and Celery beat all use this one image. They differ only in the start command.
 - **Build and registry.**
   - Artifact Registry: one Docker repository for the app images.
