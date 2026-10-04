@@ -415,11 +415,13 @@ Add Terraform in an `infra/` directory. It replaces `docker-compose.production.y
   - Adapt the generated files in `compose/production/django/`. Change only what Cloud Run needs. List each change in the final report.
   - The Django service, the Celery worker, and Celery beat all use the one image. They differ only in the command.
   - The generated `Dockerfile` already installs dependencies with `uv`. It sets `ENTRYPOINT ["/entrypoint"]` and sets no `CMD`. Add `CMD ["/start"]` after the `ENTRYPOINT`, so the Django service runs `/start` by default. The Celery worker pool and the Celery beat pool override the command with `/start-celeryworker` and `/start-celerybeat`.
-  - The generated `start` script runs `collectstatic` and then `gunicorn config.asgi` with the uvicorn worker class. It does not run `migrate`, and it binds port 5000. Make three changes:
+  - The generated `start` script runs `collectstatic` and then `gunicorn config.asgi` with the uvicorn worker class. It does not run `migrate`, and it binds port 5000. Make two changes and keep the rest of the script:
     - Add `python /app/manage.py migrate --noinput` after `collectstatic` and before `gunicorn`.
     - Change the bind to `0.0.0.0:${PORT:-8080}`, because Cloud Run sets `PORT`.
-    - Keep the rest of the script as it is.
-  - The generated `entrypoint` runs with `set -o nounset`. It reads `POSTGRES_USER`, `POSTGRES_HOST`, and `POSTGRES_PORT`, and it waits for that host and port. It exits if one variable is unset. Keep the entrypoint. Set all three variables on every Cloud Run workload, so the database host's internal address and port 5432 reach it. Set them in Terraform, next to `DATABASE_URL`.
+  - The generated `entrypoint` runs with `set -o nounset`. It reads `POSTGRES_USER`, `POSTGRES_HOST`, and `POSTGRES_PORT`, and it waits for that host and port. It exits if one variable is unset. Keep the entrypoint. Set all three variables on every Cloud Run workload in Terraform, next to `DATABASE_URL`:
+    - `POSTGRES_HOST` is the internal IP address of the database host.
+    - `POSTGRES_PORT` is `5432`.
+    - `POSTGRES_USER` is the database user from `DATABASE_URL`.
   - The `start` script is the only migration path. Add no separate migrate job.
   - If the operator chose a default superuser, add these lines to the start script right after the `migrate` line. Replace `[[admin]]` with the operator's local part and `[[domain]]` with the domain from step 1 when you write the file. Do not leave the placeholders in it.
 
