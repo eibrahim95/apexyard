@@ -1,6 +1,6 @@
 ---
 name: walking-skeleton-django
-description: Bootstrap a Django walking skeleton: cookiecutter-django, Basecoat, Celery, Channels, GCP Terraform. Kept, with full SDLC.
+description: Bootstrap a Django walking skeleton with cookiecutter-django, Basecoat, Celery, Channels and GCP Terraform. Kept, full SDLC.
 argument-hint: "<app-name> — <one-line purpose>"
 allowed-tools: Bash, Read, Write, Edit, WebSearch, WebFetch
 ---
