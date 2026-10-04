@@ -4,13 +4,13 @@ You review one builder's files. You report. You fix nothing. Write findings to `
 
 For each screen, run these checks. A check you did not run is "not verified". Never report a pass for it.
 
-1. **Coverage.** Does the screen show every item in the inventory's "Wireframe content"? List the missing items.
+1. **Coverage.** Does the screen show every region and variant the inventory lists for it (`regions` and `variants` in `screen-inventory.json`)? List the missing items.
 2. **Links.** Does every entry and exit link in `assets/link-map.json` exist and point at a real file? Does every button that should navigate do so?
 3. **Stack.** Basecoat classes used, not hand-rolled equivalents? Unpoly attributes on navigation? Alpine for widgets? Page opens standalone?
-4. **CSS rule.** Run `grep -nE '<style|style=' <files>`. Report every hit. Only the data-driven colour binding is allowed. Report any hand-named class.
+4. **CSS rule.** Run `grep -nE '<style|style=' <files>`. Report every hit. Ignore the region between `<!-- tokens:start -->` and `<!-- tokens:end -->`, and check that it matches `assets/tokens.css`. Only the data-driven colour binding is allowed otherwise. Report any hand-named class.
 5. **Detector.** Run `impeccable detect <files>`. Paste the output. Report each finding with its screen ID.
 6. **Consistency.** Same shell, data, and names as the reference screen and `data.js`?
-7. **Responsive.** Open each page in a headless browser. Sweep the width from about 320 px to 1920 px in steps of about 100 px. Check portrait and landscape phone sizes. Report, with the width where each appears:
+7. **Responsive.** Read the sweep images in `screenshots/sweep/` and `screenshots/sweep/sweep-report.json`. The orchestrator produced them for widths from about 320 px to 1920 px, plus portrait and landscape phone sizes. Do not run a browser yourself. Report, with the width where each appears:
    - horizontal page scroll
    - overflow, overlap, squeezed or stretched components
    - tap targets under 44 px
@@ -18,7 +18,7 @@ For each screen, run these checks. A check you did not run is "not verified". Ne
    - hover-only features
    - desktop-first code (max-width overrides that undo a desktop layout)
 
-   If you cannot open a headless browser, write "not verified".
+   If the sweep output is missing or does not show a check, write "not verified" for it.
 8. **Accessibility.** Contrast (4.5:1 body, 3:1 large), visible focus, labels on inputs, alt text, heading order.
 9. **UX.** Answer each for the screen:
    - Is the one primary action obvious in under three seconds?

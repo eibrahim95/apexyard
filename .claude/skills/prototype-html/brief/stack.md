@@ -1,6 +1,6 @@
 # Stack and build rules (every agent reads this)
 
-The real product uses Basecoat, Tailwind, Unpoly, Alpine, django-cotton, and Tera or django-unicorn. A browser cannot run the server parts. The prototype uses the front-end layer and fakes the server layer.
+The real product uses Basecoat, Tailwind, Unpoly, Alpine, django-cotton, and a server-side template layer. A browser cannot run the server parts. The prototype uses the front-end layer and fakes the server layer.
 
 | Piece | Real role | Use here |
 |-------|-----------|----------|
@@ -9,7 +9,7 @@ The real product uses Basecoat, Tailwind, Unpoly, Alpine, django-cotton, and Ter
 | Unpoly v3 | Navigation without reloads, modals, drawers, partial updates | Use directly. Rules below. |
 | Alpine.js v3 | Small client state: toggles, tabs, drawers, forms | Use for every interactive widget. |
 | django-cotton | Reusable template components | Cannot run. Use the comment convention below. |
-| Tera / django-unicorn | Server templates and state | Cannot run. Use `assets/data.js` and the server markers below. |
+| Server templates (for example Django templates or django-unicorn) | Server-rendered pages and state | Cannot run. Use `assets/data.js` and the server markers below. |
 
 ## Libraries and fonts
 
@@ -33,10 +33,11 @@ cd <output-dir> && python3 -m http.server 8080
 No custom CSS in any screen or fragment.
 
 - Style only with Tailwind utility classes and Basecoat classes.
-- Forbidden in `screens/` and `fragments/`: `<style>` blocks, `style="…"` attributes, and hand-named classes.
+- Forbidden in `screens/` and `fragments/`: `<style>` blocks, `style="…"` attributes, and hand-named classes. The token-block fallback below is the only exception to the `<style>` ban.
 - One exception: data-driven colours, such as book covers or avatars. Bind them with Alpine, for example `:style="{'--c1': item.c1, '--c2': item.c2}"`. Style them with utilities such as `bg-linear-to-br from-(--c1) to-(--c2)`.
 - `assets/app.css` is the only CSS file. It holds design tokens, `@font-face`, Basecoat token overrides, and keyframes declared in the theme. The design-foundation agent writes it once. Nobody else edits it.
-- Tailwind's browser build compiles inline `<style type="text/tailwindcss">` blocks. It may not compile a linked file. Verify this against the pinned version. The design-foundation agent records the working token mechanism in `DESIGN.md`.
+- Tailwind's browser build compiles inline `<style type="text/tailwindcss">` blocks. It may not compile a linked file. Verify this against the pinned version. The design agent records the working token mechanism in `DESIGN.md`.
+- Fallback, only if the browser build cannot read `assets/app.css`: the design agent writes the token block once in `assets/tokens.css`. Every page carries one identical copy between `<!-- tokens:start -->` and `<!-- tokens:end -->`, inside a `<style type="text/tailwindcss">` element. Builders paste it unchanged. The CSS checks ignore that marked region. Nothing else may use `<style>`.
 - Container queries use Tailwind's `@container` and `@md:` variants. Fluid type uses `text-[clamp(…)]` with a `rem` term, or a theme token.
 - If you need a style that no utility or Basecoat class gives, report it. Do not write CSS.
 
@@ -65,14 +66,14 @@ Mark each reusable piece with a comment so a developer can turn it into a Cotton
 <!-- /c-component -->
 ```
 
-Use it for: app shell, book card, progress bar, page header, empty state, banner, plan card, review item. Repeat the markup in each page. Do not build a runtime include system.
+Use it for the pieces that repeat: app shell, page header, empty state, banner, progress indicator, and the card for each main entity in the PRD. Repeat the markup in each page. Do not build a runtime include system.
 
 ## Server markers
 
 Where the real product renders data on the server, add a one-line comment above the block, and render it from `data.js` with `x-for`:
 
 ```html
-<!-- server: for book in in_progress_books -->
+<!-- server: for item in recent_items -->
 ```
 
 ## Rules for every agent

@@ -16,7 +16,7 @@ Build the phone layout first. Add complexity as space grows. Do not design for d
 ## Mobile behaviour to design on purpose
 
 - **Navigation.** Bottom bar on small screens. Sidebar when there is room. Pad the bottom bar with `env(safe-area-inset-bottom)`. Use `viewport-fit=cover`.
-- **Thumb reach.** Primary actions (the main task of the screen, such as continue, save, upload, or pay) sit in the lower part of the screen. No precise actions in the top corners.
+- **Thumb reach.** Put primary actions (continue, save, upload, pay) in the lower part of the screen. Keep precise actions out of the top corners.
 - **Touch targets.** At least 44 × 44 px. Use 48 px or more for primary actions. At least 8 px between targets. Padding may extend the tap area.
 - **Edges.** Side gutter of at least 16 px on all content. Controls at least 16 px from the screen edge.
 - **Progressive disclosure.** Show the most important content first on small screens. Move the rest into a drawer, sheet, accordion, or tab.

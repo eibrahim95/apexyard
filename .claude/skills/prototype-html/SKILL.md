@@ -82,6 +82,8 @@ Pick `subagent_type` from the work (see `.claude/rules/agent-role-selection.md`)
 
 Do not use `code-reviewer` for a reviewer. It writes approval markers and posts to pull requests. No pull request exists here.
 
+`ui-designer` and `ux-designer` run no browser CLI. You run the screenshot script and give them its output.
+
 ## Design and UX: use `impeccable`
 
 `impeccable` covers UI and UX: `shape` (task and UX discovery), `critique` (UX review with heuristic scoring), `audit`, `clarify`, `onboard`, `harden`. Run every `impeccable` command with `OUT` as the working directory.
@@ -104,7 +106,7 @@ Do not use `code-reviewer` for a reviewer. It writes approval markers and posts 
 3. Write `PRODUCT-RULES.md`: every testable rule in the PRD user stories and edge cases, one line each, with the story ID. A reviewer checks screens against it.
 4. Run `impeccable shape` for the home screen: the task, the one primary action, the first-viewport content.
 5. Write `DESIGN.md`: the three choices, tokens, the token mechanism that works with the Tailwind browser build, and the responsive list from `BRIEF/responsive.md`.
-6. Write `assets/app.css`: tokens, `@font-face`, Basecoat token overrides, theme keyframes. Nothing else.
+6. Write `assets/app.css`: tokens, `@font-face`, Basecoat token overrides, theme keyframes. Nothing else. If the browser build cannot read it, also write `assets/tokens.css` (see `BRIEF/stack.md`). You are the only agent that edits these files.
 
 **2b. Build agent (`frontend-engineer`).**
 
@@ -112,16 +114,19 @@ Do not use `code-reviewer` for a reviewer. It writes approval markers and posts 
 2. Build the app shell and one reference screen, the home screen: sidebar on desktop, bottom bar on phone, top bar, content area.
 3. Build **every fragment** the inventory implies (modals, drawers, sheets) in `fragments/`. Write `fragments/manifest.json`. Step 3 screens link to these by path.
 4. Write `index.html`: all screens grouped by journey, one link each.
-5. Write `tools/`: a generator for `assets/link-map.json` from the inventory JSON, a link checker, a screenshot script (widths 390, 820, 1440), and a journey walker. Run the generator.
+5. Write `tools/`: a generator for `assets/link-map.json` from the inventory JSON, a link checker, and a journey walker. Run the generator.
+6. Write the screenshot script in `tools/`. It takes a screen list and a width list. Its default mode writes images at 390, 820, and 1440 px. Its sweep mode covers 320 to 1920 px in steps of 100, plus portrait and landscape phone sizes. Sweep mode writes images and `sweep-report.json` into `screenshots/sweep/`. The report lists horizontal overflow and tap targets under 44 px, per screen and width.
 
-**2c. Gate agent (`ui-designer`).**
+**2c. Gate agent (`ui-designer`).** A separate agent from 2a and 2b. It reports and fixes nothing.
 
-1. Run `impeccable critique` and `impeccable audit` on the reference screen. Sweep widths from 320 to 1920 px, plus portrait and landscape phone. Report only.
-2. Run one round: you send the findings to 2b, it fixes, 2c re-runs once. Do not start Step 3 while a blocker or major remains. A bad foundation is copied into every screen.
+1. You run the sweep script on the reference screen first. Give the agent the image folder and `sweep-report.json`. The agent runs no browser. It marks any criterion it could not see as "not browser-verified".
+2. The agent runs `impeccable critique` and `impeccable audit` on the reference screen, from the source, the images, and the report.
+3. Run one fix round. Send findings on `assets/app.css`, `DESIGN.md`, or `PRODUCT.md` to a new lead-model agent in the 2a role. Send findings on the shell, the reference screen, fragments, or tools to 2b. Then run the sweep and a fresh 2c once more.
+4. Do not start Step 3 while a blocker or major remains. A bad foundation is copied into every screen.
 
 ## Step 3: Build (implementer model, parallel)
 
-Group the inventory screens by journey. Spawn one `frontend-engineer` per group, up to six. Merge small journeys. Split a journey that holds more than a third of all screens. Each agent owns a disjoint set of files. No agent edits a file it does not own. No one edits the reference screen, `fragments/`, or `assets/`. If an agent needs a change there, it reports to you and you route it to 2b.
+Group the inventory screens by journey. Spawn one `frontend-engineer` per group, up to six. Merge small journeys. Split a journey that holds more than a third of all screens. Each agent owns a disjoint set of files. No agent edits a file it does not own. No one edits the reference screen, `fragments/`, or `assets/`. If an agent needs a change there, it reports to you. You route a change to `assets/` to a lead-model agent in the 2a role. You route a change to the shell, `fragments/`, or `tools/` to 2b.
 
 Check the inventory so every screen ID has exactly one owner. Give an unowned screen to the lightest agent and log it. Put the hardest screen (usually the core work surface) in a group of its own.
 
@@ -133,22 +138,25 @@ Check the inventory so every screen ID has exactly one owner. Give an unowned sc
 
 ## Step 4: Review (reviewer model, parallel)
 
-One `ux-designer` per implementer. Each reads `BRIEF/review-checklist.md` and reviews only that builder's files. Reviewers report and fix nothing. A check not run is "not verified".
+Before the reviewers start, run the screenshot script in sweep mode over every screen. Reviewers read the images and `sweep-report.json`. They run no browser.
+
+Spawn one `ux-designer` per implementer. Each reads `BRIEF/review-checklist.md` and reviews only that builder's files. Reviewers report and fix nothing. A check not run is "not verified".
 
 ## Step 5: Fix (implementer model)
 
-Send each implementer its own review. It fixes all blockers and majors, and minors if cheap. It reports what it fixed and what it left, with the reason. Fix-round cap: this round, plus at most one in Step 6.
+Send each implementer its own review. It fixes all blockers and majors, and minors if cheap. It reports what it fixed and what it left, with the reason. Fix-round cap: this round, plus the one in Step 6, item 6.
 
 ## Step 6: Integration
 
 1. Run the link checker over every HTML file. Send broken links to the owning agent.
 2. Confirm every inventory ID has a file and the count matches the inventory.
 3. Run the journey walker for every journey. Run the screenshot script into `screenshots/`. Name files `<screen-id>-<width>.png`.
-4. Spawn a lead-model `ui-designer` to run `impeccable critique` on the five most important screens: home, the core work surface, the main creation flow, the main detail screen, the main conversion or payment screen. It fixes design-level findings once. This is the one extra fix round.
-5. Spawn one reviewer-model agent to compare five random screens against the PRD acceptance criteria. Fix what it finds, or log it.
-6. Write `README.md` (run command first, what is faked, screen map) and `NOTES.md` (gaps, assumptions, inventory disagreements, sample values, `EXTRA` items, anything not verified).
+4. Spawn a lead-model `ui-designer` as a critic. It runs `impeccable critique` on five screens: home, the core work surface, the main creation flow, the main detail screen, and the main conversion or payment screen. It works from the source, the images, and `sweep-report.json`. It runs no browser. It reports and fixes nothing.
+5. Spawn one reviewer-model agent to compare five random screens against the PRD acceptance criteria. It reports and fixes nothing.
+6. Run the one extra fix round. Send each finding from items 4 and 5 to the implementer that owns the file. Send a finding on `assets/app.css` to a lead-model agent in the 2a role. Log what remains.
+7. Write `README.md` (run command first, what is faked, screen map) and `NOTES.md` (gaps, assumptions, inventory disagreements, sample values, `EXTRA` items, anything not verified).
 
-Stop after Step 6. If a blocker remains, log it in `NOTES.md` and finish.
+Stop after Step 7. If a blocker remains, log it in `NOTES.md` and finish.
 
 ## Output structure
 
@@ -176,7 +184,7 @@ Propose one or two extra touches the PRD does not ask for. Mark each `EXTRA` in 
 - [ ] `index.html` lists every inventory screen. Each opens.
 - [ ] Every journey clicks through end to end with no dead link.
 - [ ] No horizontal page scroll from about 320 px to 1920 px, in portrait and landscape, in light and dark.
-- [ ] `grep` finds no `<style` block and no `style=` attribute in `screens/` or `fragments/`, apart from the data-driven colour binding.
+- [ ] `grep` finds no `<style` block and no `style=` attribute in `screens/` or `fragments/`, apart from the data-driven colour binding and the marked token block when the fallback is in use.
 - [ ] `impeccable detect` reports no errors on `screens/` and `fragments/`.
 - [ ] The prototype-controls drawer works and its state survives navigation and reload.
 - [ ] Reviews exist in `reviews/`. Every blocker and major is fixed or logged.
@@ -196,7 +204,7 @@ In this order:
 ## Rules
 
 1. **No code from the orchestrator.** Delegate every script and every fix.
-2. **Models are asked, never hardcoded.** The reviewer is never the model that built the page.
+2. **Models are asked, never hardcoded.** The reviewer model reviews every implementer-model screen. No agent reviews its own output. A critic or gate agent reports. A different agent fixes.
 3. **No custom CSS** outside `assets/app.css`. The reviewer greps for it.
 4. **No AI attribution lines** in any file.
 5. **Never claim a check passed unless it ran.** Write "not verified" instead.
