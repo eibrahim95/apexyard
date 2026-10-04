@@ -1,6 +1,6 @@
 ---
 name: walking-skeleton-django
-description: Bootstrap a Django walking skeleton: cookiecutter-django, Basecoat, Celery, Channels, GCP Terraform. Kept; full SDLC.
+description: Bootstrap a Django walking skeleton: cookiecutter-django, Basecoat, Celery, Channels, GCP Terraform. Kept, with full SDLC.
 argument-hint: "<app-name> — <one-line purpose>"
 allowed-tools: Bash, Read, Write, Edit, WebSearch, WebFetch
 ---
@@ -56,7 +56,7 @@ Ask the operator when you need to. Ask in these cases:
 - A step fails and you cannot fix it with a small, safe change.
 - An action is hard to reverse or visible outside this machine, and this skill does not authorise it.
 
-When you ask, ask one focused question at a time. Give a recommended answer and the reason. Keep going on the parts that do not depend on the answer.
+When you ask, ask one focused question at a time. The one exception is the step 1 input batch. Give a recommended answer and the reason. Keep going on the parts that do not depend on the answer.
 
 Show the plan and the planned file tree before you build. Report what is verified and what is not.
 
@@ -129,7 +129,7 @@ See AgDR-0030.
 
 ### 1. Collect the inputs
 
-Parse `$ARGUMENTS` as `<app-name> — <purpose>`. Ask only for what is missing, one question at a time.
+Parse `$ARGUMENTS` as `<app-name> — <purpose>`. Ask only for what is missing, as one batch.
 
 | Input | Form |
 |-------|------|
@@ -151,11 +151,11 @@ Parse `$ARGUMENTS` as `<app-name> — <purpose>`. Ask only for what is missing, 
 | GCP projects | The project ID for `dev` and the project ID for `prod`. Recommend two separate projects, for blast-radius isolation. If the operator gives one project, every resource name carries an environment suffix. Never invent a project ID. If the operator does not know them yet, leave the variable empty and say so in the report. |
 | SQLite for tests | Whether to hardcode the test database in `config/settings/test.py` to SQLite (step 9). Recommend yes, so tests need no Postgres. |
 
-Ask for these in one batch of focused questions, each with its recommended answer, so the operator can accept the defaults in one reply. Do not ask for anything the "Generate the project" step pins.
+Ask for these in one batch. Give each question its recommended answer, so the operator can accept the defaults in one reply. Do not ask for anything that step 4 pins.
 
 ### 2. Verify the ticket prefix
 
-Read `.ticket.prefix_whitelist` from `.claude/project-config.*.json`. The skeleton is a `[Feature]`-class ticket. If `Feature` is not in the list, stop and tell the operator to add it or to name the prefix the fork uses for delivery work.
+Read `.ticket.prefix_whitelist` from `.claude/project-config.*.json`. The skeleton is a `[Feature]`-class ticket. If `Feature` is not in the list, stop. Tell the operator to add it, or to name the prefix the fork uses for delivery work.
 
 ### 3. Show the plan and the file tree
 
@@ -163,7 +163,7 @@ Resolve the workspace and docs paths. Show the planned repo path, the docs path,
 
 ### 4. Generate the project
 
-1. Check that the cookiecutter CLI is installed. If it is not, search for the current install instructions for cookiecutter and install it in the way the operator's tooling prefers (`uv tool install cookiecutter` is the usual route). Tell the operator what you installed.
+1. Check that the cookiecutter CLI is installed. If it is not, search for the current install instructions. Install it the way the operator's tooling prefers. `uv tool install cookiecutter` is the usual route. Tell the operator what you installed.
 2. Run cookiecutter on `https://github.com/cookiecutter/cookiecutter-django` with `--no-input` and `--output-dir <workspace_dir>`. Pass every option below as `key=value`. Pass the operator's answers from step 1 for the asked options. Accept the template defaults for everything not listed.
    - From step 1: `project_name`, `project_slug`, `description`, `author_name`, `domain_name`, `email`, `open_source_license`, `username_type`, `postgresql_version`, `mail_service`, `rest_api`, `ci_tool`.
    - Pinned, never asked:
@@ -195,7 +195,7 @@ Check that these tools are installed: `uv`, `just`, `gh`, `terraform`, the `tail
    - On no, go on.
    - On yes, list the projects with `gh project list --owner <owner>`. Ask which one. Show the exact `gh project link <number> --owner <owner> --repo <owner>/<app-name>` command and wait for the go before you run it.
    - If the command fails because the token lacks the `project` scope, give the operator the `gh auth refresh -s project` command. Do not run it.
-6. Register the app in the registry (`apexyard.projects.yaml`) so the ticket-first hooks and the portfolio skills see it.
+6. Do not register the app yet. Registration is a write to the portfolio, so it waits for the ticket in step 8.
 
 ### 7. File the walking-skeleton ticket
 
@@ -242,7 +242,6 @@ proven early and we build the product on top of it.
 |------|------------|
 | Walking skeleton | Thinnest end-to-end slice exercising the whole architecture. It is kept and grown into the product. |
 | Basecoat | The shadcn/ui design system without React, used here through django-basecoat. |
-| Cloud Run worker pool | A Cloud Run resource type for non-HTTP workloads such as a Celery worker. |
 ```
 
 Labels: `enhancement`. Do not apply `spike`. There is no `walking-skeleton` exemption label.
@@ -266,6 +265,7 @@ rm -f "$body_file"
 if [ "$rc" -eq 3 ]; then
   echo "Tracker is 'none' (shape-only) — nothing was created in a tracker." >&2
   printf '%s\n' "$result"
+  exit 0
 elif [ "$rc" -ne 0 ] || [ -z "$result" ]; then
   echo "Ticket creation failed — check the tracker CLI and auth. Nothing was created." >&2
   exit 1
@@ -275,11 +275,14 @@ ref="$(printf '%s' "$result" | jq -r '.ref')"
 url="$(printf '%s' "$result" | jq -r '.url')"
 ```
 
+If the tracker is `none`, the script stops after it prints the ticket. Tell the operator to file the ticket in the external tracker. Continue from step 8 only after the operator gives you the ticket number.
+
 ### 8. Start the ticket and branch
 
 1. Run `/start-ticket {owner/repo}#${ref}`.
 2. In the new repo, create the branch `feature/GH-${ref}-walking-skeleton`.
-3. Do all remaining work on this branch.
+3. Register the app in the registry file at `$registry` (resolved in the path section). Do this now, with the ticket active, so the ticket-first hooks and the portfolio skills see the app.
+4. Do all remaining work on this branch.
 
 Put the app's docs in `<projects_dir>/<app-name>/docs/`. If the operator wants a PRD or an AgDR, use `/write-spec` or `/decide` there.
 
@@ -342,23 +345,34 @@ Add Terraform in an `infra/` directory in place of docker-compose.
 - There are two environments, `dev` and `prod`.
   - `dev` deploys automatically on every push to `main`.
   - `prod` deploys when release-please pushes a `vX.Y.Z` tag.
-  - Split the code into modules under `infra/modules/`: apis, network, registry, build, database, storage, secrets, and run. Put no environment-specific values in the modules.
-  - Add two root modules, `infra/envs/dev/` and `infra/envs/prod/`. Each one wires the same modules with its own `terraform.tfvars` (no secrets), its own `environment` variable, its own GCP project ID variable, and its own state prefix. The two environments share no state, so a change to `dev` can never touch `prod`.
+  - Split the code into modules under `infra/modules/`: apis, network, registry, build, database, storage, secrets, and run.
+  - Put no environment-specific values in the modules.
+  - Add two root modules, `infra/envs/dev/` and `infra/envs/prod/`. Each one wires the same modules.
+  - Give each root module its own `terraform.tfvars` (no secrets), `environment` variable, GCP project ID variable, and state prefix.
+  - The two environments share no state. A change to `dev` can never touch `prod`.
   - Give prod larger defaults only where the operator asks. Both environments use the same small sizes at first.
-- Add a backend block in each root module for remote state in a GCS bucket, with the bucket name as a variable and `prefix` set to the environment name. The state bucket is created outside this Terraform code. Say how to create it in the README.
+- Add a backend block in each root module for remote state in a GCS bucket. Take the bucket name from a variable. Set `prefix` to the environment name.
+- Create the state bucket outside this Terraform code. Say how to create it in the README.
 - Enable the needed Google APIs with `google_project_service`: Cloud Run, Cloud Build, Artifact Registry, Compute Engine, Secret Manager, and IAM.
 - **Container image.**
-  - Cookiecutter does not generate a Dockerfile when `use_docker=n`. Write one production Dockerfile that installs dependencies with `uv`, runs `collectstatic`, and serves the ASGI app (`use_async=y`) with gunicorn and the uvicorn worker class, the way the generated production settings document it.
+  - Cookiecutter does not generate a Dockerfile when `use_docker=n`. Write one production Dockerfile. It installs dependencies with `uv` and runs `collectstatic`. It serves the ASGI app (`use_async=y`) with gunicorn and the uvicorn worker class, as the generated production settings document.
   - The Django service, the Celery worker, and Celery beat all use this one image. They differ only in the start command.
   - Cookiecutter does not generate `compose/production/django/start` when `use_docker=n`, so write it. It is a bash script that the Dockerfile `CMD` runs for the Django service. It runs `python /app/manage.py migrate --noinput`, then the gunicorn command from the Dockerfile.
+  - This start script is the only migration path. Add no separate migrate job.
   - If the operator chose a default superuser, add these lines to the start script right after the `migrate` line. Replace `[[admin]]` with the operator's local part and `[[domain]]` with the domain from step 1 when you write the file. Do not leave the placeholders in it.
 
     ```bash
-    SUPERUSER_EXISTS=$(echo "from django.contrib.auth import get_user_model;User=get_user_model();print(User.objects.filter(email=\"${DJANGO_DEFAULT_SUPERUSER_USERNAME:-[[admin]]@[[domain]]}\").count())" | python manage.py shell --no-imports)
-    test $SUPERUSER_EXISTS == 0 && DJANGO_SUPERUSER_PASSWORD=${DJANGO_DEFAULT_SUPERUSER_PASSWORD:-superadmin} python manage.py createsuperuser --email ${DJANGO_DEFAULT_SUPERUSER_USERNAME:-[[admin]]@[[domain]]} --noinput || true
+    if [ -n "${DJANGO_DEFAULT_SUPERUSER_PASSWORD:-}" ]; then
+      SUPERUSER_EXISTS=$(echo "from django.contrib.auth import get_user_model;User=get_user_model();print(User.objects.filter(email=\"${DJANGO_DEFAULT_SUPERUSER_USERNAME:-[[admin]]@[[domain]]}\").count())" | python /app/manage.py shell --no-imports)
+      test $SUPERUSER_EXISTS == 0 && DJANGO_SUPERUSER_PASSWORD=${DJANGO_DEFAULT_SUPERUSER_PASSWORD} python /app/manage.py createsuperuser --email ${DJANGO_DEFAULT_SUPERUSER_USERNAME:-[[admin]]@[[domain]]} --noinput || true
+    fi
     ```
 
-  - The `superadmin` fallback password is public. In Terraform, store `DJANGO_DEFAULT_SUPERUSER_PASSWORD` in Secret Manager and pass it to the Cloud Run service as a secret reference, so production never uses the fallback. Tell the operator in the final report to change the password after the first login. If `username_type` is `username`, adjust the `filter` and `createsuperuser` calls to match the user model.
+  - The guard means no admin is created when the secret is empty. The script has no fallback password, because a known password on a public URL breaks the "no hardcoded secrets" rule.
+  - In Terraform, store `DJANGO_DEFAULT_SUPERUSER_PASSWORD` in Secret Manager and pass it to the Cloud Run service as a secret reference.
+  - Tell the operator in the final report to change the password after the first login.
+  - If `username_type` is `username`, adjust the `filter` and `createsuperuser` calls to match the user model.
+  - Several instances can start at once, and each one runs `migrate`. Record that race in the AgDR, with the mitigation you choose.
 - **Build and registry.**
   - Artifact Registry: one Docker repository for the app images.
   - Add a cleanup policy that deletes untagged images.
@@ -366,19 +380,19 @@ Add Terraform in an `infra/` directory in place of docker-compose.
   - Kaniko writes its cache as tagged images, so the untagged-image policy will not remove it. Give the cache its own repository or path, with an age-based cleanup policy.
   - Check that the kaniko executor image you choose is still published and maintained. If it is not, tell the operator before you pick a replacement.
   - Add one `cloudbuild.yaml` for both environments. It takes the substitutions `_ENV` and `_PROJECT_ID`. After the image is pushed, it deploys that image to the Cloud Run service and to both worker pools of the target environment. The migrate and superuser steps run in the container start script.
-  - Add two Cloud Build triggers in each environment's project, each with its own service account that has only the roles it needs:
+  - Add one Cloud Build trigger in the `dev` project and one in the `prod` project. Give each trigger its own service account with only the roles it needs.
     - `dev` trigger: fires on a push to the `main` branch and runs `cloudbuild.yaml` with `_ENV=dev`.
-    - `prod` trigger: fires on a push of a tag that matches `^v[0-9]+\.[0-9]+\.[0-9]+$` and runs `cloudbuild.yaml` with `_ENV=prod`. Turn on the trigger's manual approval option. Recommend it, and tell the operator how to turn it off.
-  - Terraform creates the Cloud Run resources, but Cloud Build owns their image. Add `lifecycle { ignore_changes }` on the container image, so a later `terraform apply` does not roll a deploy back.
+    - `prod` trigger: fires on a push of a tag that matches `^v[0-9]+\.[0-9]+\.[0-9]+$` and runs `cloudbuild.yaml` with `_ENV=prod`.
+    - Turn on manual approval for the `prod` trigger. Tell the operator how to turn it off.
+  - Terraform creates the Cloud Run resources, and Cloud Build owns their image. Add `lifecycle { ignore_changes }` on the container image. A later `terraform apply` then does not roll a deploy back.
   - The prod build rebuilds the image from the tagged commit. Kaniko's cache keeps this fast. Note in the AgDR that promoting the dev image instead is the alternative.
   - Connecting the GitHub repo to Cloud Build is a one-time manual step in the console. Terraform cannot do it without an operator login. Put the steps in the README and the final report.
-  - Check that a tag pushed by release-please still fires the Cloud Build trigger. Release-please tags through the GitHub API. If a webhook is not delivered for that tag, say so in the report and suggest the fix, such as a fine-grained token for the release workflow.
+  - Check that a tag pushed by release-please still fires the Cloud Build trigger. Release-please tags through the GitHub API. If the webhook is not delivered for that tag, say so in the report. Suggest a fix, such as a fine-grained token for the release workflow.
   - Record this CI/CD and environment design in an AgDR with `/decide`.
 - **Cloud Run workloads.**
   - A Cloud Run service for the Django app.
   - A Cloud Run worker pool for the Celery worker.
   - A Cloud Run worker pool for Celery beat, fixed at exactly one instance.
-  - A Cloud Run job that runs `manage.py migrate`.
   - Give each workload its own service account with least privilege.
   - Check the current Terraform provider docs for the worker pool resource. Check that the provider version you pin supports it.
 - **Database host.** One small Compute Engine instance that runs Postgres and Redis.
