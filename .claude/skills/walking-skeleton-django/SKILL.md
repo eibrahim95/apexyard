@@ -71,13 +71,18 @@ Core model: the server owns the page and the client animates it. This is a hyper
   - When a needed element has no django-basecoat component, use the Basecoat CSS classes directly. Wrap the result in a project cotton component in `templates/cotton/`.
   - Write a custom component only when neither Basecoat option exists. Never hand-roll a dropdown, dialog, select, or tabs.
   - Style the app through Basecoat's theme tokens. Do not add a second component library. Do not use Web Awesome.
-  - Check that Basecoat's interactive components (dialog, dropdown, select) still work after an Unpoly fragment swap and inside an Unpoly layer. If one needs re-initialisation, do it in an `up.compiler()`.
+  - After an Unpoly update, re-bind Basecoat widgets in an `up.compiler()` that returns a cleanup function. Do not call `dialog.showModal()` inside a layer. Unpoly already opened the overlay.
 - django-cotton 2.x provides server-side components with slots and props. Components live in `templates/cotton/` and stay presentational. Business logic stays in views and services.
-- Unpoly 3.x handles navigation: fragment swaps and layers (modals). Use the `unpoly` pip package and its `UnpolyMiddleware` for `request.up`. Do not implement the Unpoly protocol yourself. Build small view mixins on top of `request.up` (form, layer, delete) in `unpoly_mixins.py`.
-- Alpine.js 3.x handles local UI state. Re-initialise Alpine on `up:fragment:inserted`. Alpine is for state and Unpoly is for navigation. Do not cross the two.
+- Unpoly 3.x owns navigation. Use the `unpoly` package and `UnpolyMiddleware`. Do not implement the protocol. Put form, layer, and delete mixins in `unpoly_mixins.py`.
+  - Every URL returns one full HTML document. Unpoly extracts a region from it. Do not return a fragment-only body. Do not add a JSON endpoint for UI.
+  - Root content is `<main up-main>`. A modal page marks its region `up-main="modal"`. A direct visit renders that page. An overlay extracts the same region.
+  - Open a modal with one control: `<c-button type="button" up-href="/welcome/" up-follow up-layer="new">`. Never nest a button in an `<a>`. Unpoly follows `a[href]` and `[up-follow]` only.
+  - `.up-modal-box` is the only frame. Do not put a card inside it. Set its background to `var(--color-surface)`.
+- Alpine.js 3.x owns local state. Do not use it to navigate.
+  - Load `static/js/app.js` with `defer`, before the Alpine script. Register the theme store inside `alpine:init`. A script after Alpine misses that event.
+  - On `up:fragment:inserted`, call `Alpine.initTree` on the inserted fragment only.
 - Tailwind CSS 4.x uses CSS-first configuration: `@theme {}`, no `tailwind.config.js`, no content array. Name tokens by function (`--color-surface`), not by colour.
-- Render HTML on the server at every URL. Use one URL per fragment. Do not build JSON endpoints to feed UI.
-- Initialise JavaScript with `up.compiler()` and return a cleanup function. Never use `DOMContentLoaded` for anything inside a fragment.
+- Initialise other page scripts with `up.compiler()` and return a cleanup function. Do not use `DOMContentLoaded` for swapped content.
 - Bake in dark mode from the first commit with a three-way toggle: system, light, dark.
   - Put `data-theme` on `<html>`.
   - Add a synchronous inline script before paint to prevent a flash of the wrong theme.
@@ -85,7 +90,7 @@ Core model: the server owns the page and the client animates it. This is a hyper
   - Wire Tailwind with `@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *))`.
   - Set `color-scheme` on `:root` to match.
   - Make Basecoat follow the same theme. Check how Basecoat selects its dark palette. If it uses a different hook than `data-theme`, bridge the two with a custom variant or a token mapping.
-- Use this folder layout: `templates/cotton/` (components, including a theme toggle), `templates/layouts/` (base, app, auth), `templates/partials/` (fragments), `templates/pages/`, `static/js/` (`app.js` and `compilers/`), `static/css/`, and `unpoly_mixins.py`.
+- Use this folder layout: `templates/cotton/` (components, including a theme toggle), `templates/layouts/` (base, app, auth), `templates/partials/` (includes, not URLs), `templates/pages/`, `static/js/` (`app.js` and `compilers/`), `static/css/`, and `unpoly_mixins.py`.
 
 ## Docker policy
 
@@ -501,7 +506,7 @@ Write an `AGENTS.md` in the new repo. It lists the stack, the architecture rules
 
 ### 15. Prove the skeleton works end to end
 
-- Build one trivial slice: a home page made from Basecoat components. Use at least a button, a card, a dropdown menu, and a dialog that opens in an Unpoly layer. Compose them in one project cotton component. Add a Tailwind class. The theme toggle must work, and Basecoat must follow the dark theme.
+- Home page: a Basecoat button, card, and dropdown menu in one cotton component, plus one Tailwind class. One button opens `/welcome/` in one Unpoly modal, per the rules above. The theme toggle, Basecoat, and the modal follow the dark theme.
 - Add one test for the page.
 - Add a trivial Celery task named `ping`. Add a test that runs it eagerly.
 - Add a trivial websocket consumer on `ws/ping/` that replies `pong`. Add a test that connects with `channels.testing.WebsocketCommunicator`, sends a message, and checks the reply. Use the in-memory channel layer. When you run the app, start it with the "uvicorn Server" task command so the websocket route is reachable.

@@ -55,6 +55,14 @@ This is a throwaway. Optimise for speed of learning and for how the product feel
 
 ## Step 1: Setup (before any sub-agent)
 
+0. **Set the bootstrap marker.** This skill writes throwaway files before any ticket exists. It is on the `ticket.bootstrap_skills` list. Write the marker so `require-active-ticket.sh` exempts its writes. Remove the marker on every exit path, including a stop or a failure.
+
+   ```bash
+   mkdir -p .claude/session && echo "prototype-html" > .claude/session/active-bootstrap
+   # at the end of the run:
+   rm -f .claude/session/active-bootstrap
+   ```
+
 1. **Ask the operator for two models.** Do not hardcode names. Ask for the **implementer** model (builds screens) and the **reviewer** model (reviews them). They must be different models. Prefer different families. If the operator picks two from one family, say that the review is less independent, and proceed only on confirmation.
 2. **Probe both.** Spawn a one-line probe agent on each model with the Agent tool's `model` parameter. If a model is unavailable, stop and report the exact name that failed. Never substitute another model.
 3. **Lead model** is your own model. The design, build, and gate agents run on it. Pass it explicitly in the `model` parameter. Do not leave it to a default.
