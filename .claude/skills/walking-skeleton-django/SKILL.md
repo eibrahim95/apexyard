@@ -1,6 +1,6 @@
 ---
 name: walking-skeleton-django
-description: Bootstrap a Django walking skeleton with cookiecutter-django, Basecoat, Celery, Channels and GCP Terraform. Kept, full SDLC.
+description: Bootstrap a Django walking skeleton with cookiecutter-django, Basecoat, Celery, Channels, and a Cloud Build deploy to Cloud Run. Kept, full SDLC.
 argument-hint: "<app-name> — <one-line purpose>"
 allowed-tools: Bash, Read, Write, Edit, WebSearch, WebFetch
 ---
@@ -33,7 +33,8 @@ workspace_dir=$(portfolio_workspace_dir)   # portfolio.workspace_dir
 ```
 
 - The app **repo** is generated into `<workspace_dir>/<app-name>/`.
-- The app's **docs** (PRD, designs, AgDRs) go in `<projects_dir>/<app-name>/docs/`. They do not go in the repo and they do not go in `_inbox`.
+- Put the PRD and designs in `<projects_dir>/<app-name>/docs/`. Do not put them in `_inbox`.
+- Write each app AgDR in the app repo at `docs/agdr/`. Do not put an app AgDR in the portfolio.
 
 ## Usage
 
@@ -122,7 +123,7 @@ Pick the first option in this list that meets the need. Move down only when the 
 5. tetra (a full-stack component framework built on Alpine.js, called "terra" in conversation). Use it only on pages that need high interactivity. Do not use it for ordinary pages.
 
 - Do not install django-unicorn or tetra in the skeleton. The home-page slice needs neither.
-- Record each first use of option 4 or 5 in an AgDR with `/decide`. Adding a dependency is a material decision.
+- Record each first use of option 4 or 5 in an AgDR with `/decide`. Write that file in the app repo at `docs/agdr/`.
 - Put this ladder in the new repo's AGENTS.md.
 
 ## Process
@@ -172,10 +173,16 @@ Parse `$ARGUMENTS` as `<app-name> — <purpose>`. Ask only for what is missing, 
 | REST API | `rest_api` option: None, DRF, or Django Ninja. Recommend None unless the purpose needs an API. |
 | CI tool | `ci_tool` option: None, Travis, Gitlab, Github, or Drone. Recommend Github. |
 | Default superuser | Whether the production start script creates a default superuser, and the local part of its email (default `admin`). The email becomes `<admin>@<domain_name>` using the domain from this table. Recommend yes. |
-| GCP projects | The project ID for `dev` and the project ID for `prod`. Recommend two separate projects, for blast-radius isolation. If the operator gives one project, every resource name carries an environment suffix. Never invent a project ID. If the operator does not know them yet, leave the variable empty and say so in the report. |
+| GCP projects | The project id for `dev` and the project id for `prod`. Recommend two projects. Accept one project when the operator has one. Never invent a project id. If the ids are unknown, leave them empty. Say that in the report. |
+| Cloud Build connection | The existing 2nd-gen connection name. Ask for it. Do not invent a name. |
+| Region and zone | The GCP region and the database zone. Ask for both. Do not invent them. |
 | SQLite for tests | Whether to hardcode the test database in `config/settings/test.py` to SQLite (step 9). Recommend yes, so tests need no Postgres. |
 
 Ask for these in one batch. Give each question its recommended answer, so the operator can accept the defaults in one reply. Do not ask for anything that step 4 pins.
+
+Do not write a project id into `cloudbuild.yaml` defaults.
+The admin email is the superuser email from this table.
+Pass the connection name, region, zone, project id, and admin email into the bootstrap script.
 
 ### 2. Verify the ticket prefix
 
@@ -207,18 +214,25 @@ Resolve the workspace and docs paths. Show the planned repo path, the docs path,
    If cookiecutter created a `.venv`, delete it. The venv holds absolute paths that the rename breaks. Step 9 creates a new one.
 4. Check that these generated files exist: `justfile`, `compose/production/django/Dockerfile`, `compose/production/django/start`, and `docker-compose.local.yml`. If one is missing, stop and ask the operator.
 5. Make sure the generated project is a git repository. Run `git init` if cookiecutter did not. Use `main` as the default branch.
-6. Make the first commit on `main` from the untouched cookiecutter output, with the message `chore: initial cookiecutter-django output`. This commit stays local. The operator pushes it.
+6. Before the first commit, check `git config --global user.name` and `git config --global user.email`. If either is empty, set both on this repo only, using the author name and email from step 1: `git config user.name` and `git config user.email`. Do not change the global config.
+7. Make the first commit on `main` from the untouched cookiecutter output, with the message `chore: initial cookiecutter-django output`. Leave this commit unpushed. Step 6 pushes `main`.
 
 ### 5. Check the tools
 
-Check that these tools are installed: `uv`, `just`, `gh`, `terraform`, the `tailwindcss` CLI, a Redis server, and `docker`. Step 4 already checked that the Docker daemon runs. Report what is missing. Ask before you install anything on the operator's machine.
+Check that these tools are installed.
+The tools are `uv`, `just`, `gh`, `gcloud`, `terraform`, the `tailwindcss` CLI, a Redis server, and `docker`.
+Step 4 already checked that the Docker daemon runs.
+Report what is missing.
+Ask before you install anything on the operator's machine.
 
 ### 6. Create the GitHub repository
 
 1. Show the exact `gh repo create <owner>/<app-name>` command with the visibility from the inputs. Wait for the operator's explicit go before you run it.
 2. Create the repo empty: no README, no `.gitignore`, no license, and no `--source` or `--push` flag.
 3. Add the remote with `git remote add origin <url>`. Verify it with `git remote -v`.
-4. Do not push. Leave the push for the operator.
+4. Push `main` to `origin` before step 8.
+   Do not push any other branch.
+   The ticket branch needs this base to open a PR.
 5. Ask whether to link the repo to a GitHub Project. Wait for the answer.
    - On no, go on.
    - On yes, list the projects with `gh project list --owner <owner>`. Ask which one. Show the exact `gh project link <number> --owner <owner> --repo <owner>/<app-name>` command and wait for the go before you run it.
@@ -247,10 +261,11 @@ proven early and we build the product on top of it.
 - [ ] A trivial Celery task has a test that runs it eagerly
 - [ ] Django Channels is installed and registered (`INSTALLED_APPS`, ASGI router, Redis channel layer), and a trivial websocket consumer has a test
 - [ ] `terraform fmt` and `terraform validate` pass for the full GCP stack in both `dev` and `prod`
-- [ ] The Docker image builds through Cloud Build and kaniko
-- [ ] A push to `main` deploys to `dev`, and a `vX.Y.Z` release tag deploys to `prod`
-- [ ] The operator performs the first deploy and a smoke test passes against
-      the live `dev` Cloud Run URL, then against the `prod` URL after the first release tag
+- [ ] Cloud Build builds the image with Docker BuildKit, not Kaniko
+- [ ] `gcloud builds submit` of the feature branch deploys `dev`
+- [ ] The dev Cloud Run revision is Ready and migrations ran
+- [ ] A push to `main` deploys to `dev`
+- [ ] A `vX.Y.Z` release tag deploys to `prod` after trigger approval
 - [ ] The slice's logic has tests with > 80% coverage (KEPT code, not
       spike-exempt) and passes Rex and the security gate
 
@@ -259,7 +274,7 @@ proven early and we build the product on top of it.
 - Basecoat / Cotton / Unpoly / Alpine / Tailwind frontend with dark mode
 - Celery worker and beat, Django Channels, justfile recipes, Zed tasks
 - release-please
-- GCP Terraform for two environments (dev on push to main, prod on release tag): build, registry, Cloud Run, database host, network, media bucket
+- GCP Terraform for `dev` and `prod`. Cloud Build is the only apply. The bootstrap script submits the first `dev` deploy.
 
 ## Out of Scope (built later on the skeleton)
 - Business features, real auth providers, email, monitoring and alerting
@@ -346,11 +361,15 @@ If the `project` token scope is missing, give the operator `gh auth refresh -s p
 3. Register the app in the registry file at `$registry` (resolved in the path section). Do this now, with the ticket active, so the ticket-first hooks and the portfolio skills see the app.
 4. Do all remaining work on this branch.
 
-Put the app's docs in `<projects_dir>/<app-name>/docs/`. If the operator wants a PRD or an AgDR, use `/write-spec` or `/decide` there.
+Put the PRD and designs in `<projects_dir>/<app-name>/docs/`.
+If the operator wants a PRD, use `/write-spec` there.
+Write each AgDR in the app repo at `docs/agdr/`.
+Do not write an app AgDR in the portfolio.
 
 ### 9. Local environment and cleanup
 
 - Run `uv venv` and activate `.venv`. Use no Docker for local development. Leave the generated compose files in place (see "Docker policy").
+- Run `uv run pre-commit install` so commits run the hooks.
 - Set the `USE_DOCKER` default to False in `config/settings/local.py` with `env("USE_DOCKER", default=False)`.
 - Switch off `ATOMIC_REQUESTS`.
 - Fix `{project_slug}/contrib/sites/migrations/0003_set_site_domain_and_name.py` to work with SQLite. The `if created` block becomes `if created and not is_sqlite:`. Detect SQLite from the database engine in the normal way.
@@ -378,8 +397,14 @@ Put the app's docs in `<projects_dir>/<app-name>/docs/`. If the operator wants a
   - Put the websocket routes in `<project_slug>/routing.py`. Put consumers in `<project_slug>/consumers.py`.
   - Set `CHANNEL_LAYERS` in `base.py` to `channels_redis.core.RedisChannelLayer`, with `hosts` read from `REDIS_URL`. Override it with `channels.layers.InMemoryChannelLayer` in `config/settings/test.py`, so tests need no Redis.
   - Keep Channels out of the Celery wiring. Celery stays the task queue and Channels stays the websocket layer. They share the one Redis, but use different keys.
-  - Record the dependency choice in an AgDR with `/decide`. Adding a dependency is a material decision.
-- Do not create the Postgres database. Put the exact command in the final report. Run the skeleton check against SQLite with `DATABASE_URL=sqlite:///db.sqlite3`. Run the tests against SQLite too, through the hardcoded test settings when the operator chose them, otherwise through the same `DATABASE_URL`. Tests run Celery tasks eagerly, so they need no Redis.
+  - Record the dependency choice in an AgDR with `/decide`. Write that file in the app repo at `docs/agdr/`.
+- Do not create a Postgres role or database by hand.
+  The startup script creates both on the database VM.
+  Run the skeleton check against SQLite with `DATABASE_URL=sqlite:///db.sqlite3`.
+  Run the tests against SQLite too.
+  Use the hardcoded test settings when the operator chose them.
+  Otherwise use the same `DATABASE_URL`.
+  Tests run Celery tasks eagerly, so they need no Redis.
 
 ### 10. Add the frontend stack
 
@@ -401,81 +426,340 @@ Put the app's docs in `<projects_dir>/<app-name>/docs/`. If the operator wants a
 
 ### 12. Add Terraform
 
-Add Terraform in an `infra/` directory. It replaces `docker-compose.production.yml` for deployment.
+Add Terraform under `infra/`.
+It replaces `docker-compose.production.yml` for deployment.
+Cloud Build is the only `terraform apply`.
+On the laptop, run `terraform fmt` and `terraform validate` only.
 
-- Target GCP. Pin the provider and Terraform versions. Declare inputs as variables. Write no secrets in any file.
-- There are two environments, `dev` and `prod`.
-  - `dev` deploys automatically on every push to `main`.
+- Target GCP.
+  Pin the Google provider.
+  The build installs Terraform 1.9.8.
+- Declare inputs as variables.
+  Write no secrets in any file.
+- Use two environments, `dev` and `prod`.
+  - `dev` deploys on every push to `main`.
   - `prod` deploys when release-please pushes a `vX.Y.Z` tag.
-  - Split the code into modules under `infra/modules/`: apis, network, registry, build, database, storage, secrets, and run.
+  - Put modules under `infra/modules/`.
+    Use `apis`, `network`, `registry`, `build`, `database`, `storage`, `secrets`, and `run`.
   - Put no environment-specific values in the modules.
-  - Add two root modules, `infra/envs/dev/` and `infra/envs/prod/`. Each one wires the same modules.
-  - Give each root module its own `terraform.tfvars` (no secrets), `environment` variable, GCP project ID variable, and state prefix.
-  - The two environments share no state. A change to `dev` can never touch `prod`.
-  - Give prod larger defaults only where the operator asks. Both environments use the same small sizes at first.
-- Add a backend block in each root module for remote state in a GCS bucket. Take the bucket name from a variable. Set `prefix` to the environment name.
-- Create the state bucket outside this Terraform code. Say how to create it in the README.
-- Enable the needed Google APIs with `google_project_service`: Cloud Run, Cloud Build, Artifact Registry, Compute Engine, Secret Manager, and IAM.
-- **Container image.**
-  - Adapt the generated files in `compose/production/django/`. Change only what Cloud Run needs. List each change in the final report.
-  - The Django service, the Celery worker, and Celery beat all use the one image. They differ only in the command.
-  - The generated `Dockerfile` already installs dependencies with `uv`. It sets `ENTRYPOINT ["/entrypoint"]` and sets no `CMD`. Add `CMD ["/start"]` after the `ENTRYPOINT`, so the Django service runs `/start` by default. The Celery worker pool and the Celery beat pool override the command with `/start-celeryworker` and `/start-celerybeat`.
-  - The generated `start` script runs `collectstatic` and then `gunicorn config.asgi` with the uvicorn worker class. It does not run `migrate`, and it binds port 5000. Make two changes and keep the rest of the script:
-    - Add `python /app/manage.py migrate --noinput` after `collectstatic` and before `gunicorn`.
-    - Change the bind to `0.0.0.0:${PORT:-8080}`, because Cloud Run sets `PORT`.
-  - The generated `entrypoint` runs with `set -o nounset`. It reads `POSTGRES_USER`, `POSTGRES_HOST`, and `POSTGRES_PORT`, and it waits for that host and port. It exits if one variable is unset. Keep the entrypoint. Set all three variables on every Cloud Run workload in Terraform, next to `DATABASE_URL`:
-    - `POSTGRES_HOST` is the internal IP address of the database host.
-    - `POSTGRES_PORT` is `5432`.
-    - `POSTGRES_USER` is the database user from `DATABASE_URL`.
-  - The `start` script is the only migration path. Add no separate migrate job.
-  - If the operator chose a default superuser, add these lines to the start script right after the `migrate` line. Replace `[[admin]]` with the operator's local part and `[[domain]]` with the domain from step 1 when you write the file. Do not leave the placeholders in it.
+  - Add root modules at `infra/envs/dev/` and `infra/envs/prod/`.
+  - Each root module wires the same modules.
+  - Give each root module a `terraform.tfvars` file, an `environment` variable, a project id variable, and a state prefix.
+  - Write no secrets in `terraform.tfvars`.
+  - The two environments share no state.
+    A change to `dev` must not touch `prod`.
+  - Use the same small sizes for both environments unless the operator asks for a larger prod.
+- Recommend two GCP projects.
+  Accept one project when that is what the operator has.
+- When `dev` and `prod` share one project, record the limit in the AgDR.
+  The `dev` build account can read `prod` secrets.
+- Keep the state prefixes `dev` and `prod`.
+- Give `dev` and `prod` different subnet CIDRs when they share a project.
+  Use `10.10.0.0/24` for `dev` and `10.20.0.0/24` for `prod`.
+- Add a `backend "gcs"` block in each root module.
+  Set `prefix` to the environment name.
+  Do not set the bucket name in the committed backend.
+- `infra/apply.sh` creates `gs://<project>-<app>-tfstate` when the bucket is missing.
+  It then runs `terraform init -input=false -backend-config="bucket=<bucket>"`.
+- Do not tell the operator to create the state bucket.
 
-    ```bash
-    if [ -n "${DJANGO_DEFAULT_SUPERUSER_PASSWORD:-}" ]; then
-      SUPERUSER_EXISTS=$(echo "from django.contrib.auth import get_user_model;User=get_user_model();print(User.objects.filter(email=\"${DJANGO_DEFAULT_SUPERUSER_USERNAME:-[[admin]]@[[domain]]}\").count())" | python /app/manage.py shell --no-imports)
-      test $SUPERUSER_EXISTS == 0 && DJANGO_SUPERUSER_PASSWORD="${DJANGO_DEFAULT_SUPERUSER_PASSWORD}" python /app/manage.py createsuperuser --email ${DJANGO_DEFAULT_SUPERUSER_USERNAME:-[[admin]]@[[domain]]} --noinput || true
-    fi
-    ```
+**Apply script.** Add `infra/apply.sh`.
+It accepts `infra` or `services`.
+Cloud Build runs it.
+Do not run it on the laptop.
 
-  - The guard means no admin is created when the secret is empty. The script has no fallback password, because a known password on a public URL breaks the "no hardcoded secrets" rule.
-  - In Terraform, store `DJANGO_DEFAULT_SUPERUSER_PASSWORD` in Secret Manager and pass it to the Cloud Run service as a secret reference.
-  - Tell the operator in the final report to change the password after the first login.
-  - If `username_type` is `username`, adjust the `filter` and `createsuperuser` calls to match the user model.
-  - Several instances can start at once, and each one runs `migrate`. Record that race in the AgDR, with the mitigation you choose.
-- **Build and registry.**
-  - Artifact Registry: one Docker repository for the app images.
-  - Add a cleanup policy that deletes untagged images.
-  - Add `cloudbuild.yaml` that builds the image with kaniko and its layer cache, then pushes it to Artifact Registry. Tag each image with the commit SHA.
-  - Kaniko writes its cache as tagged images, so the untagged-image policy will not remove it. Give the cache its own repository or path, with an age-based cleanup policy.
-  - Check that the kaniko executor image you choose is still published and maintained. If it is not, tell the operator before you pick a replacement.
-  - Add one `cloudbuild.yaml` for both environments. It takes the substitutions `_ENV` and `_PROJECT_ID`. After the image is pushed, it deploys that image to the Cloud Run service and to both worker pools of the target environment. The migrate and superuser steps run in the container start script.
-  - Add one Cloud Build trigger in the `dev` project and one in the `prod` project. Give each trigger its own service account with only the roles it needs.
-    - `dev` trigger: fires on a push to the `main` branch and runs `cloudbuild.yaml` with `_ENV=dev`.
-    - `prod` trigger: fires on a push of a tag that matches `^v[0-9]+\.[0-9]+\.[0-9]+$` and runs `cloudbuild.yaml` with `_ENV=prod`.
-    - Turn on manual approval for the `prod` trigger. Tell the operator how to turn it off.
-  - Terraform creates the Cloud Run resources, and Cloud Build owns their image. Add `lifecycle { ignore_changes }` on the container image. A later `terraform apply` then does not roll a deploy back.
-  - The prod build rebuilds the image from the tagged commit. Kaniko's cache keeps this fast. Note in the AgDR that promoting the dev image instead is the alternative.
-  - Connecting the GitHub repo to Cloud Build is a one-time manual step in the console. Terraform cannot do it without an operator login. Put the steps in the README and the final report.
-  - Check that a tag pushed by release-please still fires the Cloud Build trigger. Release-please tags through the GitHub API. If the webhook is not delivered for that tag, say so in the report. Suggest a fix, such as a fine-grained token for the release workflow.
-  - Record this CI/CD and environment design in an AgDR with `/decide`.
-- **Cloud Run workloads.**
-  - A Cloud Run service for the Django app.
-  - A Cloud Run worker pool for the Celery worker.
-  - A Cloud Run worker pool for Celery beat, fixed at exactly one instance.
-  - Give each workload its own service account with least privilege.
-  - Check the current Terraform provider docs for the worker pool resource. Check that the provider version you pin supports it.
-- **Database host.** One small Compute Engine instance that runs Postgres and Redis.
-  - No public IP. Use a separate persistent data disk for Postgres data.
-  - Provision Postgres and Redis with a startup script. Require a password for Redis.
-  - Add a snapshot schedule for the data disk and a nightly `pg_dump` to a GCS backup bucket.
-- **Networking between Cloud Run and the instance.**
-  - Create a VPC and a subnet. Connect Cloud Run through Direct VPC egress. Use a Serverless VPC Access connector only if Direct VPC egress does not fit.
-  - Add firewall rules that allow only Postgres (5432) and Redis (6379), and only from the Cloud Run subnet.
-  - Allow SSH to the instance only through IAP. Add Cloud NAT for outbound traffic from the instance.
-- **Storage.** A GCS bucket for media, with uniform bucket-level access. Give the Django service account access to this bucket only. Configure Django to use it through `django-storages`.
-- **Secrets.** Store `DJANGO_SECRET_KEY`, `DATABASE_URL`, `REDIS_URL`, and (when a default superuser was chosen) `DJANGO_DEFAULT_SUPERUSER_PASSWORD` in Secret Manager. Pass them to the Cloud Run workloads as secret references.
-- Add outputs for the Cloud Run URL, the registry path, and the media bucket name.
-- Run `terraform fmt` and run `terraform validate` in both `infra/envs/dev/` and `infra/envs/prod/`. Do not run `terraform apply`.
+- `cloud-sdk:slim` does not contain Terraform.
+  Install Terraform 1.9.8 in the build before `terraform init`.
+- Pass `-lock-timeout=5m` on every apply.
+- Pass `_CLOUDBUILD_REPOSITORY=none`.
+  Terraform must not create a second trigger.
+- The trigger resource depends on Cloud Run names.
+  Those names do not exist during the infra phase.
+- Import the build account before the first targeted apply.
+  Do this when bootstrap already created the account and state does not contain it.
+- Do not print secret values, database URLs, or Redis URLs.
+
+**Infra phase.** Apply targets in this order.
+Do not create Cloud Run in this phase.
+
+1. Apply the API module and the secret containers.
+   Include the database URL secret and the Redis URL secret.
+   Add their versions after the database address is known.
+2. Generate a secret version when none exists.
+   Generate the Django secret, the database password, the Redis password, and the superuser password.
+3. Apply the network module and the database module.
+4. Wait until the data-disk Postgres accepts connections.
+   Do not start the services phase before that wait succeeds.
+5. Write the database URL secret from the database internal IP.
+   Write the Redis URL secret from that IP and the Redis password.
+   Replace either secret when its value changed.
+6. Apply the registry, the build account, the runtime accounts, the secret IAM bindings, and storage.
+
+- Secret ids are static strings, such as `<app>-<env>-django-secret-key`.
+  A fresh state fails when a `for_each` key is unknown.
+- The build account `act_as_runtime` map uses static keys.
+  Use the keys `django`, `worker`, and `beat`.
+  Do not use a resource attribute as a `for_each` key.
+- The database password secret is write-once.
+  Generate it before the instance boots.
+  Do not add a second version in this skill.
+- `POSTGRES_HOST` and `DATABASE_URL` share one source.
+  That source is the database internal IP.
+- The entrypoint waits on `POSTGRES_HOST`.
+  Django migrates through `DATABASE_URL`.
+  The host in those two values must match.
+- Rewrite the database URL secret when the VM address changes.
+
+**Services phase.** Run `infra/apply.sh services` with `_IMAGE` set to the pushed image.
+The script exits if `_IMAGE` is empty.
+Create the Cloud Run service and both worker pools only in this phase.
+The service depends on its secret IAM bindings.
+Every referenced secret needs a version before this phase.
+
+**Container image.**
+
+- Adapt the files in `compose/production/django/`.
+  Change only what Cloud Run needs.
+  List each change in the final report.
+- The Django service, the Celery worker, and Celery beat use one image.
+  Only the command differs.
+- Keep the Dockerfile `RUN --mount=type=bind` lines for `uv.lock` and `pyproject.toml`.
+- Add `CMD ["/start"]` after the `ENTRYPOINT` when the Dockerfile has no `CMD`.
+- The worker command is `/start-celeryworker`.
+  The beat command is `/start-celerybeat`.
+- Do not build with Kaniko.
+  Kaniko cannot see those bind-mounted files, so the build exits.
+- Build with Docker BuildKit.
+  Use the builder `gcr.io/cloud-builders/docker`.
+  Set `DOCKER_BUILDKIT=1`.
+- Do not return to Kaniko unless the Dockerfile drops those mounts.
+- Do not default the image to `us-docker.pkg.dev/cloudrun/container/hello`.
+  That image has no `/start-celerybeat`.
+- Give the image variable no default.
+  The services phase sets it.
+- Tag the image with the commit SHA.
+  Push that tag.
+  The image path is `<region>-docker.pkg.dev/<project>/<app>-<env>/<app>:<short-sha>`.
+
+**Start script.** Keep the generated gunicorn command.
+Change the bind to `0.0.0.0:${PORT:-8080}`.
+After `collectstatic`, take advisory lock `728194`.
+Run `migrate` while that lock is held.
+Then release the lock.
+Hold the lock in the Django session.
+Run `migrate` in a child process.
+Postgres releases the lock when that session ends.
+The start script is the only migration path.
+Do not add a migrate job.
+Create the superuser only when `DJANGO_DEFAULT_SUPERUSER_PASSWORD` is set.
+The build generates that secret.
+The operator does not type it.
+Use no fallback password.
+If `username_type` is `username`, match the user model in the lookup and in `createsuperuser`.
+Tell the operator to change the password after the first login.
+Replace `[[admin]]` and `[[domain]]` when you write the file.
+Do not leave those placeholders in the app repo.
+
+```bash
+python /app/manage.py shell --no-imports <<'LOCK'
+import subprocess
+
+from django.db import connection
+
+LOCK_ID = 728194
+
+with connection.cursor() as cursor:
+    cursor.execute("SELECT pg_advisory_lock(%s)", [LOCK_ID])
+try:
+    subprocess.check_call(["python", "/app/manage.py", "migrate", "--noinput"])
+finally:
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_advisory_unlock(%s)", [LOCK_ID])
+LOCK
+
+if [ -n "${DJANGO_DEFAULT_SUPERUSER_PASSWORD:-}" ]; then
+  SUPERUSER_EXISTS=$(echo "from django.contrib.auth import get_user_model;User=get_user_model();print(User.objects.filter(email=\"${DJANGO_DEFAULT_SUPERUSER_USERNAME:-[[admin]]@[[domain]]}\").count())" | python /app/manage.py shell --no-imports)
+  test $SUPERUSER_EXISTS == 0 && DJANGO_SUPERUSER_PASSWORD="${DJANGO_DEFAULT_SUPERUSER_PASSWORD}" python /app/manage.py createsuperuser --email ${DJANGO_DEFAULT_SUPERUSER_USERNAME:-[[admin]]@[[domain]]} --noinput || true
+fi
+```
+
+Record the migrate race and this lock in the AgDR.
+
+**Entrypoint.** Keep the generated entrypoint.
+It uses `set -o nounset`.
+Set `POSTGRES_USER`, `POSTGRES_HOST`, and `POSTGRES_PORT` on every workload.
+`POSTGRES_PORT` is `5432`.
+`POSTGRES_USER` is the database user in `DATABASE_URL`.
+`POSTGRES_HOST` is the same IP as the host in `DATABASE_URL`.
+`wait-for-it` is not a readiness gate.
+A first boot that is still installing packages outlasts that wait.
+
+**Database startup script.** The database VM runs the same Postgres version as step 1.
+
+- Use `set -euo pipefail`.
+  Never use `set -x`.
+- The script reads the metadata token, the database password, and the Redis password.
+  Do not put those values in a traced command.
+  Do not print them.
+- Stop the packaged `postgresql` service before `pg_ctl`.
+  Then disable that service.
+- The Debian package binds port 5432.
+  The data-disk server must bind that port.
+- The script creates the database role and the database.
+  Do not tell the operator to create either one.
+- A metadata change does not rerun the startup script until the next boot.
+  The first boot must be correct.
+- After `pg_isready` succeeds on the data-disk server, print one ready line.
+- `infra/apply.sh` polls the serial port for that line.
+  Fail the infra phase if the line does not appear.
+  Do not print the serial port output.
+
+**Build file.** Add one `cloudbuild.yaml` for both environments.
+
+- Do not default `_PROJECT_ID`.
+  You may default `_ENV` to `dev` and `_CLOUDBUILD_REPOSITORY` to `none`.
+- Pass `_PROJECT_ID`, `_REGION`, and `_ENV` from the trigger and from `gcloud builds submit`.
+- Set logging to `CLOUD_LOGGING_ONLY`.
+- Use four steps: infra apply, image build, image push, then services apply.
+- Each apply step uses `gcr.io/google.com/cloudsdktool/cloud-sdk:slim`.
+  Install Terraform 1.9.8 in that step.
+- The build step uses `gcr.io/cloud-builders/docker` with `DOCKER_BUILDKIT=1`.
+- Set `timeout: 1800s`.
+  That covers the image build and the first database boot.
+- A trigger supplies `SHORT_SHA`.
+  `gcloud builds submit` does not.
+  Pass `SHORT_SHA` on the submit command.
+
+**Bootstrap.** Add `bin/bootstrap-cloud-build.sh`.
+Write it in this step.
+Run it in step 15.
+It runs once from the laptop.
+It does not run Terraform.
+
+Use the connection name, region, zone, project id, and admin email from step 1.
+Do not hardcode a project id.
+
+The script does this:
+
+1. Enable Cloud Build, Resource Manager, and IAM.
+2. Create `<prefix>-dev-build` and `<prefix>-prod-build`.
+   Derive `<prefix>` from the app name.
+   Keep each account id between 6 and 30 characters.
+   Do not reuse another app's build account.
+3. Grant each build account these roles:
+   - `roles/editor`
+   - `roles/iam.securityAdmin`
+   - `roles/iam.serviceAccountAdmin`
+   - `roles/serviceusage.serviceUsageAdmin`
+   - `roles/secretmanager.admin`
+   - `roles/artifactregistry.admin`
+   - `roles/logging.logWriter`
+4. Do not grant those roles to the default Cloud Build account.
+5. Grant `roles/iam.serviceAccountUser` on each build account to the Cloud Build service agent.
+   The agent is `service-<projectNumber>@gcp-sa-cloudbuild.iam.gserviceaccount.com`.
+6. Grant that same role on each build account to the user who submits.
+7. Link the GitHub repository with `gcloud builds repositories create`.
+   Pass `--connection`, `--region`, and `--remote-uri`.
+8. Create triggers with `--repository` and `--region`.
+   Do not use the 1st-gen `--repo-name` flag.
+   That API fails with `Repository mapping does not exist`.
+9. The connection login is a human step.
+   The repository link is not.
+   If the connection does not exist, stop.
+   Ask the operator to finish that login.
+   Do not link the repository in the console.
+10. Create the `dev` trigger on `^main$`.
+    Do not require approval.
+11. Create the `prod` trigger on `^v[0-9]+\.[0-9]+\.[0-9]+$`.
+    Pass `--require-approval` on create.
+12. Do not call `gcloud builds triggers update github --require-approval`.
+    That command returns `INVALID_ARGUMENT` on this 2nd-gen trigger.
+13. If the prod trigger exists and approval is already true, leave it.
+14. If approval is not true, delete the trigger and create it again.
+15. Submit the current feature-branch commit with `gcloud builds submit` and the `dev` build account.
+    Pass `_CLOUDBUILD_REPOSITORY=none` and `SHORT_SHA`.
+16. The `dev` trigger cannot deploy a feature branch.
+    It listens only to `main`.
+17. Pushing `main` is not this proof.
+
+On a retry, submit the build again.
+Do not run the IAM grants again.
+Before a submit, check for a build in status `WORKING`.
+If one exists, wait.
+Do not submit a second build.
+
+**Cloud Run.**
+
+- Add one Cloud Run service for Django.
+- Add one worker pool for the Celery worker.
+- Add one worker pool for Celery beat, with exactly one instance.
+- Set `deletion_protection = false` on the service and on both pools.
+- Set `launch_stage = "BETA"` on both worker pools.
+- `ignore_changes` lists `client` and `client_version` only.
+  Do not ignore the container image.
+- Grant `allUsers` the role `roles/run.invoker`.
+  Say in the report that an organization policy can still return 403.
+- Set `DJANGO_ALLOWED_HOSTS` so the value includes `.run.app` and the app domain.
+- Give each workload its own service account.
+  Grant only the access that workload needs.
+- Read the current provider docs for the worker pool resource.
+  Pin a provider version that supports it.
+- Store `DJANGO_SECRET_KEY`, `DATABASE_URL`, `REDIS_URL`, and `DJANGO_DEFAULT_SUPERUSER_PASSWORD` in Secret Manager.
+  Pass each one as a secret reference.
+- Pass `POSTGRES_HOST`, `POSTGRES_PORT`, and `POSTGRES_USER` as plain environment variables.
+- Runtime account ids use the same prefix as the build accounts.
+  Use `<prefix>-<env>-web`, `<prefix>-<env>-worker`, `<prefix>-<env>-beat`, and `<prefix>-<env>-db`.
+
+**Database host.** One small Compute Engine instance runs Postgres and Redis.
+
+- Give the instance no public IP.
+  Use a separate persistent disk for data.
+- The startup script installs Postgres and Redis.
+  Require a password for Redis.
+- Add a daily snapshot schedule for the data disk.
+  Add a nightly `pg_dump` to a backup bucket.
+
+**Networking.**
+
+- Create a VPC and a subnet.
+  Connect Cloud Run with Direct VPC egress.
+- Use a Serverless VPC Access connector only when Direct VPC egress does not fit.
+- Allow port `5432` and port `6379` only from the Cloud Run subnet.
+- Allow SSH only through IAP.
+  Add Cloud NAT for outbound traffic from the instance.
+
+**Storage.** Add one media bucket with uniform bucket-level access.
+Give only the Django service account access to that bucket.
+Configure Django to use it through `django-storages`.
+
+**Registry.** Add one Artifact Registry Docker repository.
+Add a cleanup policy that deletes untagged images.
+Do not add a Kaniko cache repository.
+
+**AgDR.** Write the deploy record in the app repo at `docs/agdr/`.
+
+- Record that Cloud Build is the only `terraform apply`.
+  A laptop apply is not the deploy path.
+- Record Docker BuildKit, not Kaniko, and the bind-mount reason.
+- Record the two roots and the separate state prefixes.
+  When both environments share one project, record that the `dev` build account can read `prod` secrets.
+- Record that the prod trigger requires approval.
+  Record delete-and-create when approval is off.
+  Do not record the update command.
+- Record that the connection login is manual.
+  Record that the repository link is not.
+- An AgDR that still requires Kaniko or a laptop apply is wrong.
+  Change the record so it matches this path.
+
+**Release tags.** Check that a release-please tag still starts the prod trigger.
+Release-please creates the tag through the GitHub API.
+If the Cloud Build connection misses that tag, say so in the report.
+
+**Outputs.** Add outputs for the Cloud Run URL, the registry path, and the media bucket name.
+
+**Checks.** Run `terraform fmt`.
+Run `terraform validate` in `infra/envs/dev/` and in `infra/envs/prod/`.
+Do not run `terraform apply`.
 
 ### 13. Add Zed tasks
 
@@ -512,6 +796,27 @@ Write an `AGENTS.md` in the new repo. It lists the stack, the architecture rules
 - Add a trivial websocket consumer on `ws/ping/` that replies `pong`. Add a test that connects with `channels.testing.WebsocketCommunicator`, sends a message, and checks the reply. Use the in-memory channel layer. When you run the app, start it with the "uvicorn Server" task command so the websocket route is reachable.
 - Run `pytest`, `mypy`, and `pre-commit`. Report the exact results.
 - Run the app and check the page in a browser. If you cannot run a browser, say which criteria you could not verify there.
+- Run `bin/bootstrap-cloud-build.sh` from the app repo.
+  This is the first deploy proof.
+- The proof is `gcloud builds submit` of the current feature-branch commit.
+  Pushing `main` is not the proof.
+- Do not ask for approval of the dev submit.
+  The skill authorizes that submit.
+- If `gcloud` is not authenticated, stop.
+  Ask the operator to finish the `gcloud` login.
+- If the GitHub connection does not exist, stop.
+  Ask the operator to finish that login.
+  Do not link the repository in the console.
+- Do not submit while a build is `WORKING`.
+- If the build fails, submit it again.
+  Do not run the IAM grants again.
+- After the build status is `SUCCESS`, read the Cloud Run URL.
+- Confirm the revision is Ready.
+  Confirm that migrations ran.
+  Read the service logs for the migrate result.
+- Do not print secret values, database URLs, or Redis URLs.
+- Do not merge.
+  Rex and an explicit human nod own the merge.
 
 ### 16. Report
 
@@ -519,14 +824,23 @@ Report in plain language. Lead with the outcome. Then give:
 
 - The repo path, the branch, the ticket URL, and the GitHub repo URL.
 - What is verified, with the command and the result.
-- What is not verified, and why. The first deploy is always on this list, because the operator runs it.
+- What is not verified, and why.
+- The build id and status from `gcloud builds submit`.
+  That submit is the first deploy proof.
+  Pushing `main` is not the proof.
+  Step 6 already pushed `main`.
+- The Cloud Run URL when the build status is `SUCCESS`.
+  State whether the revision is Ready and whether migrations ran.
 - The manual steps left for the operator:
-  - Add the secret values in Secret Manager for each environment. If `DJANGO_DEFAULT_SUPERUSER_PASSWORD` has no value, the start script creates no admin and prints nothing.
-  - Push `main` and the feature branch.
-  - Create the Postgres database on the host or the database VM.
+  - Finish the one-time `gcloud` login if it is still open.
+  - Finish the GitHub connection login if the connection does not exist.
+  - Approve the prod trigger when a prod release runs.
+  - Push the feature branch.
+    Do not push it to prove the dev deploy.
   - Start Redis locally.
-  - Create the Terraform state bucket, then run `terraform apply` in `infra/envs/dev/` and in `infra/envs/prod/`.
-  - Connect the GitHub repo to Cloud Build in each GCP project, so the `main` and release-tag triggers can fire.
+  - Change the generated superuser password after the first login.
+  - Merge only after Rex and an explicit human nod.
+    Do not merge from this skill.
 
 Remove the active-issue-skill marker.
 
@@ -538,12 +852,27 @@ Remind the operator that this is a KEPT skeleton and goes through the full SDLC.
    If you change a pinned cookiecutter option, check every step that mentions it before you run.
 2. **Confirm outward-facing actions.** The GitHub repo, the project link, and the ticket each need a yes.
 3. **KEPT, not throwaway.** Do not apply the `spike` label or any exemption label.
-4. **Nothing pushes and nothing applies.** Do not run `git push` or `terraform apply`. The operator runs them.
+4. **Push `main` once. Cloud Build applies.**
+   Step 6 pushes `main` and no other branch.
+   Do not push the feature branch.
+   Do not run `terraform apply` on the laptop.
+   Cloud Build is the only apply.
+   The first proof is `gcloud builds submit` of the feature branch.
+   Pushing `main` is not that proof.
 5. **Use Basecoat first.** Never hand-roll a component that Basecoat ships.
 6. **Do not install django-unicorn or tetra** in the skeleton.
 7. **Register every ticket.** Add each ticket this skill creates to the linked GitHub Project. Set its milestone, labels, size, priority, dates, and dependencies (step 7b). Read the fields back before you report them as set.
 8. **Branch name.** Always `feature/GH-<ticket>-walking-skeleton`.
 9. **Report what is not verified.** Do not describe an unrun check as passed.
+10. **Three human steps.** Keep the one-time `gcloud` and GitHub connection login.
+    Keep prod trigger approval.
+    Keep the merge gate.
+    The merge needs Rex and an explicit human nod.
+    Do not merge from this skill.
+    Do not ask the operator to type secrets.
+    Do not ask the operator to create the database or the state bucket.
+    Do not ask the operator to link the repository in the console.
+    Do not ask the operator to run the first deploy or the first `terraform apply`.
 
 ## Where this sits in the SDLC
 
