@@ -269,10 +269,10 @@ Ask before you install anything on the operator's machine.
     The ticket branch needs this base to open a PR.
     Do not push when migrate or pytest failed.
 12. Ask whether to link the repo to a GitHub Project. Wait for the answer.
-   - On no, go on.
-   - On yes, list the projects with `gh project list --owner <owner>`. Ask which one. Show the exact `gh project link <number> --owner <owner> --repo <owner>/<app-name>` command and wait for the go before you run it.
-   - If the command fails because the token lacks the `project` scope, give the operator the `gh auth refresh -s project` command. Do not run it.
-   - Record the project owner and number. Step 7 needs them. If the operator chose no project, step 7 skips the project fields and says so in the report.
+    - On no, go on.
+    - On yes, list the projects with `gh project list --owner <owner>`. Ask which one. Show the exact `gh project link <number> --owner <owner> --repo <owner>/<app-name>` command and wait for the go before you run it.
+    - If the command fails because the token lacks the `project` scope, give the operator the `gh auth refresh -s project` command. Do not run it.
+    - Record the project owner and number. Step 7 needs them. If the operator chose no project, step 7 skips the project fields and says so in the report.
 13. Do not register the app yet. Registration is a write to the portfolio, so it waits for the ticket in step 8.
 
 ### 7. File the walking-skeleton ticket
