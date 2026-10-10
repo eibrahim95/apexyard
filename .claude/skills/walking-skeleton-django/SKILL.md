@@ -176,7 +176,7 @@ Parse `$ARGUMENTS` as `<app-name> — <purpose>`. Ask only for what is missing, 
 | GCP projects | The project id for `dev` and the project id for `prod`. Recommend two projects. Accept one project when the operator has one. Never invent a project id. If the ids are unknown, leave them empty. Say that in the report. |
 | Cloud Build connection | The existing 2nd-gen connection name. Ask for it. Do not invent a name. |
 | Region and zone | The GCP region and the database zone. Ask for both. Do not invent them. |
-| SQLite for tests | Whether to hardcode the test database in `config/settings/test.py` to SQLite (step 9). Recommend yes, so tests need no Postgres. |
+| SQLite for tests | Whether tests use SQLite in `config/settings/test.py`. Recommend yes. Local development still uses PostgreSQL. |
 
 Ask for these in one batch. Give each question its recommended answer, so the operator can accept the defaults in one reply. Do not ask for anything that step 4 pins.
 
@@ -215,12 +215,14 @@ Resolve the workspace and docs paths. Show the planned repo path, the docs path,
 4. Check that these generated files exist: `justfile`, `compose/production/django/Dockerfile`, `compose/production/django/start`, and `docker-compose.local.yml`. If one is missing, stop and ask the operator.
 5. Make sure the generated project is a git repository. Run `git init` if cookiecutter did not. Use `main` as the default branch.
 6. Before the first commit, check `git config --global user.name` and `git config --global user.email`. If either is empty, set both on this repo only, using the author name and email from step 1: `git config user.name` and `git config user.email`. Do not change the global config.
-7. Make the first commit on `main` from the untouched cookiecutter output, with the message `chore: initial cookiecutter-django output`. Leave this commit unpushed. Step 6 pushes `main`.
+7. Make the first commit on `main` from the untouched cookiecutter output, with the message `chore: initial cookiecutter-django output`. Leave this commit unpushed. Step 6 pushes `main` after the local PostgreSQL migrate and pytest pass.
 
 ### 5. Check the tools
 
 Check that these tools are installed.
-The tools are `uv`, `just`, `gh`, `gcloud`, `terraform`, the `tailwindcss` CLI, a Redis server, and `docker`.
+The tools are `uv`, `just`, `gh`, `gcloud`, `terraform`, the `tailwindcss` CLI, Redis, Docker, and PostgreSQL.
+PostgreSQL must be the version from step 1.
+It runs on the host, not in Docker.
 Step 4 already checked that the Docker daemon runs.
 Report what is missing.
 Ask before you install anything on the operator's machine.
@@ -230,15 +232,48 @@ Ask before you install anything on the operator's machine.
 1. Show the exact `gh repo create <owner>/<app-name>` command with the visibility from the inputs. Wait for the operator's explicit go before you run it.
 2. Create the repo empty: no README, no `.gitignore`, no license, and no `--source` or `--push` flag.
 3. Add the remote with `git remote add origin <url>`. Verify it with `git remote -v`.
-4. Push `main` to `origin` before step 8.
-   Do not push any other branch.
-   The ticket branch needs this base to open a PR.
-5. Ask whether to link the repo to a GitHub Project. Wait for the answer.
+4. Prove local PostgreSQL before the push.
+   Local development uses PostgreSQL.
+   SQLite is only for tests, and only when step 1 chose it.
+   Do not set the local `DATABASE_URL` to SQLite.
+5. Run `uv sync` in the app repo.
+   Run `uv run pre-commit install` when the hook is missing.
+6. Apply the `USE_DOCKER` change from step 9.
+   When step 1 chose SQLite, apply the test database block from step 9.
+   When step 1 chose SQLite, apply the sites migration fix from step 9.
+   Leave those edits uncommitted.
+   The first commit stays the untouched cookiecutter output.
+7. Create `.env` when the file is missing.
+   Keep `.env` gitignored.
+   Set `REDIS_URL` to Redis on the host.
+   Do not invent a PostgreSQL password.
+8. Ask the operator to set the PostgreSQL keys in `.env`.
+   The keys are `DATABASE_URL`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`.
+   Recommend host `127.0.0.1` and port `5432`.
+   Recommend the project slug as the database name.
+   Wait until the operator confirms that the file is saved.
+9. Migrate with `config.settings.local`:
+   `DJANGO_READ_DOT_ENV_FILE=True uv run python manage.py migrate`
+   That command must use the PostgreSQL `DATABASE_URL`.
+   If that database does not exist, stop.
+   Ask the operator to create it.
+   Do not invent credentials.
+10. Run `DJANGO_READ_DOT_ENV_FILE=True uv run pytest`.
+    These are the generated tests.
+    The skeleton tests come in step 15.
+    When step 1 chose SQLite, this run uses `config.settings.test`.
+    Do not point that run at the local PostgreSQL database.
+    When tests use PostgreSQL, the role must be allowed to create a database.
+11. Push `main` to `origin` only after migrate and pytest succeed.
+    Do not push any other branch.
+    The ticket branch needs this base to open a PR.
+    Do not push when migrate or pytest failed.
+12. Ask whether to link the repo to a GitHub Project. Wait for the answer.
    - On no, go on.
    - On yes, list the projects with `gh project list --owner <owner>`. Ask which one. Show the exact `gh project link <number> --owner <owner> --repo <owner>/<app-name>` command and wait for the go before you run it.
    - If the command fails because the token lacks the `project` scope, give the operator the `gh auth refresh -s project` command. Do not run it.
    - Record the project owner and number. Step 7 needs them. If the operator chose no project, step 7 skips the project fields and says so in the report.
-6. Do not register the app yet. Registration is a write to the portfolio, so it waits for the ticket in step 8.
+13. Do not register the app yet. Registration is a write to the portfolio, so it waits for the ticket in step 8.
 
 ### 7. File the walking-skeleton ticket
 
@@ -368,16 +403,23 @@ Do not write an app AgDR in the portfolio.
 
 ### 9. Local environment and cleanup
 
-- Run `uv venv` and activate `.venv`. Use no Docker for local development. Leave the generated compose files in place (see "Docker policy").
-- Run `uv run pre-commit install` so commits run the hooks.
-- Set the `USE_DOCKER` default to False in `config/settings/local.py` with `env("USE_DOCKER", default=False)`.
+- Reuse the `.venv` from step 6. Use no Docker for local development. Leave the generated compose files in place (see "Docker policy").
+- Step 6 already ran `uv run pre-commit install`. Run it again only when the hook is missing.
+- Set the `USE_DOCKER` default to False in `config/settings/local.py`.
+  Use `env("USE_DOCKER", default=False)`.
+  Step 6 applies this change before the push.
+  Do not set it back.
 - Switch off `ATOMIC_REQUESTS`.
-- Fix `{project_slug}/contrib/sites/migrations/0003_set_site_domain_and_name.py` to work with SQLite. The `if created` block becomes `if created and not is_sqlite:`. Detect SQLite from the database engine in the normal way.
+- When tests use SQLite, fix `{project_slug}/contrib/sites/migrations/0003_set_site_domain_and_name.py`.
+  Change `if created` to `if created and not is_sqlite`.
+  Detect SQLite from the database engine.
+  Step 6 applies this fix before the push.
+  Do not edit that migration twice.
 - Remove `python-slugify`, `django-crispy-forms`, and `crispy-bootstrap5` from the dependencies and from `base.py`.
-- Create a sample `.env`. Include `DATABASE_URL` and `REDIS_URL` for the Celery broker.
-- Local development has no Docker, so Redis runs on the host. Set `REDIS_URL` to the local Redis in the sample `.env`. Put the command to start Redis in the final report and in the README.
+- Keep the `.env` from step 6. Do not replace its PostgreSQL `DATABASE_URL`.
+- Put the host Redis start command in the final report and in the README.
 - Keep the Celery worker and beat running through new justfile recipes that call `uv run celery` directly. Do not use the compose recipes for them.
-- If the operator chose SQLite for tests, hardcode the test database in `config/settings/test.py`. Place this block after the existing imports and settings. It replaces any `DATABASES` the file inherits:
+- Step 6 already hardcoded the test database when the operator chose SQLite. Do not add this block twice. The block is:
 
   ```python
   DATABASES = {
@@ -398,13 +440,14 @@ Do not write an app AgDR in the portfolio.
   - Set `CHANNEL_LAYERS` in `base.py` to `channels_redis.core.RedisChannelLayer`, with `hosts` read from `REDIS_URL`. Override it with `channels.layers.InMemoryChannelLayer` in `config/settings/test.py`, so tests need no Redis.
   - Keep Channels out of the Celery wiring. Celery stays the task queue and Channels stays the websocket layer. They share the one Redis, but use different keys.
   - Record the dependency choice in an AgDR with `/decide`. Write that file in the app repo at `docs/agdr/`.
-- Do not create a Postgres role or database by hand.
-  The startup script creates both on the database VM.
-  Run the skeleton check against SQLite with `DATABASE_URL=sqlite:///db.sqlite3`.
-  Run the tests against SQLite too.
-  Use the hardcoded test settings when the operator chose them.
-  Otherwise use the same `DATABASE_URL`.
-  Tests run Celery tasks eagerly, so they need no Redis.
+- Do not create a Postgres role or database by hand on the database VM.
+  The startup script creates both there.
+- Local development keeps the PostgreSQL `DATABASE_URL` from step 6.
+  Do not point that URL at SQLite.
+- Step 15 runs the skeleton tests.
+  When the operator chose SQLite, those tests use `config.settings.test`.
+  They do not use the local PostgreSQL database.
+- Tests run Celery tasks eagerly, so they need no Redis.
 
 ### 10. Add the frontend stack
 
@@ -828,7 +871,7 @@ Report in plain language. Lead with the outcome. Then give:
 - The build id and status from `gcloud builds submit`.
   That submit is the first deploy proof.
   Pushing `main` is not the proof.
-  Step 6 already pushed `main`.
+  Step 6 pushed `main` only after the local PostgreSQL migrate and pytest passed.
 - The Cloud Run URL when the build status is `SUCCESS`.
   State whether the revision is Ready and whether migrations ran.
 - The manual steps left for the operator:
@@ -854,6 +897,7 @@ Remind the operator that this is a KEPT skeleton and goes through the full SDLC.
 3. **KEPT, not throwaway.** Do not apply the `spike` label or any exemption label.
 4. **Push `main` once. Cloud Build applies.**
    Step 6 pushes `main` and no other branch.
+   Push `main` only after the local PostgreSQL migrate and pytest pass.
    Do not push the feature branch.
    Do not run `terraform apply` on the laptop.
    Cloud Build is the only apply.
